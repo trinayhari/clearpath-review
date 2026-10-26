@@ -1,9 +1,93 @@
-import {test,expect} from '@playwright/test';
-test('complete isolated evaluator workflow and preserved approval history',async({page})=>{
- await page.goto('/');await expect(page.getByRole('heading',{name:'Review queue',exact:true})).toBeVisible();await page.screenshot({path:'artifacts/queue-desktop.png',fullPage:true});
- await page.getByRole('button',{name:'New submission'}).click();await page.getByLabel('Campaign name').fill('A thoughtful launch');await page.getByLabel('Marketing copy').fill('Get guaranteed approval for your personal loan today. Explore a brighter financial future with ClearPath.');await page.getByRole('button',{name:'Create draft',exact:true}).click();
- await page.getByLabel('Test analysis recovery').selectOption('timeout');await page.getByRole('button',{name:'Run precheck',exact:true}).click();await expect(page.locator('.alert.error')).toContainText('timed out');await expect(page.getByLabel('Edit marketing copy')).toHaveValue(/guaranteed approval/);await page.getByLabel('Test analysis recovery').selectOption('normal');await page.getByRole('button',{name:'Run precheck',exact:true}).click();await expect(page.getByRole('heading',{name:'Approval cannot be guaranteed'})).toBeVisible();await page.getByRole('button',{name:'Preview edit'}).click();await page.getByRole('button',{name:'Save as v2'}).click();await page.getByRole('button',{name:'Run precheck',exact:true}).click();await expect(page.getByRole('heading',{name:'No rule matches found'})).toBeVisible();await page.getByRole('button',{name:'Submit v2 for review'}).click();await expect(page.getByLabel('Edit marketing copy')).toHaveCount(0);
- await page.getByLabel('Demo role').selectOption('reviewer');await page.screenshot({path:'artifacts/review-desktop.png',fullPage:true});await page.getByRole('button',{name:'Record decision',exact:true}).click();await page.getByLabel('Rationale').fill('Verified the revised wording and product eligibility conditions.');await page.getByRole('button',{name:'Confirm decision · v2'}).click();await expect(page.getByRole('status')).toContainText('Decision recorded');
- await page.getByRole('button',{name:'Activity',exact:true}).click();await expect(page.getByText('approved this version')).toBeVisible();await page.getByLabel('Demo role').selectOption('marketer');await page.getByRole('button',{name:'Save as v3'}).click();await expect(page.getByRole('status')).toContainText('New immutable version');await page.getByLabel('Content version').selectOption('1');await expect(page.getByText('approved this version')).toBeVisible();
+import { test, expect } from "@playwright/test";
+test("complete isolated evaluator workflow and preserved approval history", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Review queue", exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: "artifacts/queue-desktop.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "New submission" }).click();
+  await page.getByLabel("Campaign name").fill("A thoughtful launch");
+  await page
+    .getByLabel("Marketing copy")
+    .fill(
+      "Get guaranteed approval for your personal loan today. Explore a brighter financial future with ClearPath.",
+    );
+  await page.getByRole("button", { name: "Create draft", exact: true }).click();
+  await page.getByLabel("Test analysis recovery").selectOption("timeout");
+  await page.getByRole("button", { name: "Run precheck", exact: true }).click();
+  await expect(page.locator(".alert.error")).toContainText("timed out");
+  await expect(page.getByLabel("Edit marketing copy")).toHaveValue(
+    /guaranteed approval/,
+  );
+  await page.getByLabel("Test analysis recovery").selectOption("normal");
+  await page.getByRole("button", { name: "Run precheck", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Approval cannot be guaranteed" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Preview edit" }).click();
+  await page.getByRole("button", { name: "Save as v2" }).click();
+  await page.getByRole("button", { name: "Run precheck", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "No rule matches found" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Submit v2 for review" }).click();
+  await expect(page.getByLabel("Edit marketing copy")).toHaveCount(0);
+  await page.getByLabel("Demo role").selectOption("reviewer");
+  await page.screenshot({
+    path: "artifacts/review-desktop.png",
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Record decision", exact: true })
+    .click();
+  await page
+    .getByLabel("Rationale")
+    .fill("Verified the revised wording and product eligibility conditions.");
+  await page.getByRole("button", { name: "Confirm decision · v2" }).click();
+  await expect(page.getByRole("status")).toContainText("Decision recorded");
+  await page.getByRole("button", { name: "Activity", exact: true }).click();
+  await expect(page.getByText("approved this version")).toBeVisible();
+  await page.getByLabel("Demo role").selectOption("marketer");
+  await page.getByRole("button", { name: "Save as v3" }).click();
+  await expect(page.getByRole("status")).toContainText("New immutable version");
+  await page.getByLabel("Content version").selectOption("1");
+  await expect(page.getByText("approved this version")).toBeVisible();
 });
-test('queue filters, policy library, analytics, mobile layout and auth denial',async({page,request})=>{await page.goto('/');await page.getByLabel('Search campaigns').fill('nothing matches');await expect(page.getByRole('heading',{name:'No campaigns match'})).toBeVisible();await page.getByRole('button',{name:'Reset filters'}).click();await page.getByRole('button',{name:'Policy library',exact:true}).click();await expect(page.getByText('Fictional policies for demonstration')).toBeVisible();await page.getByRole('button',{name:'Analytics',exact:true}).click();await expect(page.getByRole('heading',{name:'Review insights'})).toBeVisible();await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:/Review queue/}).click();await page.screenshot({path:'artifacts/queue-mobile.png',fullPage:true});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);const r=await request.post('/api/workspace',{data:{action:'approve'}});expect([401,403,503]).toContain(r.status())});
+test("queue filters, policy library, analytics, mobile layout and auth denial", async ({
+  page,
+  request,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("Search campaigns").fill("nothing matches");
+  await expect(
+    page.getByRole("heading", { name: "No campaigns match" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Reset filters" }).click();
+  await page
+    .getByRole("button", { name: "Policy library", exact: true })
+    .click();
+  await expect(
+    page.getByText("Fictional policies for demonstration"),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Analytics", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Review insights" }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: /Review queue/ }).click();
+  await page.screenshot({ path: "artifacts/queue-mobile.png", fullPage: true });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  const r = await request.post("/api/workspace", {
+    data: { action: "approve" },
+  });
+  expect([401, 403, 503]).toContain(r.status());
+});

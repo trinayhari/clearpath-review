@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 test("complete isolated evaluator workflow and preserved approval history", async ({
   page,
 }) => {
+  const browserErrors: string[] = [];
+  page.on("pageerror", (e) => browserErrors.push(e.message));
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: "Review queue", exact: true }),
@@ -57,10 +59,10 @@ test("complete isolated evaluator workflow and preserved approval history", asyn
   await expect(page.getByRole("status")).toContainText("New immutable version");
   await page.getByLabel("Content version").selectOption("1");
   await expect(page.getByText("approved this version")).toBeVisible();
+  expect(browserErrors).toEqual([]);
 });
 test("queue filters, policy library, analytics, mobile layout and auth denial", async ({
   page,
-  request,
 }) => {
   await page.goto("/");
   await page.getByLabel("Search campaigns").fill("nothing matches");
@@ -86,8 +88,15 @@ test("queue filters, policy library, analytics, mobile layout and auth denial", 
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  const r = await request.post("/api/workspace", {
-    data: { action: "approve" },
-  });
-  expect([401, 403, 503]).toContain(r.status());
+  const status = await page.evaluate(
+    async () =>
+      (
+        await fetch("/api/workspace", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "approve" }),
+        })
+      ).status,
+  );
+  expect([401, 403, 503]).toContain(status);
 });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { serverClient } from "@/lib/supabase";
+import { serverClient, configured } from "@/lib/supabase";
 import { contentSchema, mockProvider } from "@/lib/domain";
 import { z } from "zod";
 const command = z.object({
@@ -100,6 +100,11 @@ export async function GET() {
 }
 export async function POST(req: NextRequest) {
   try {
+    if (!configured())
+      return NextResponse.json(
+        { error: "Authenticated workspace is not configured." },
+        { status: 503 },
+      );
     if (req.headers.get("origin") !== req.nextUrl.origin)
       return NextResponse.json(
         { error: "Invalid request origin" },

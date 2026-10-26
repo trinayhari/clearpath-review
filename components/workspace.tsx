@@ -48,7 +48,11 @@ const actionLabels: Record<string, string> = {
   comment: "commented",
 };
 const date = (s: string) =>
-  new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  new Date(s).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 function Badge({ value }: { value: string }) {
   return (
     <span className={`badge ${value.toLowerCase().replaceAll(" ", "-")}`}>
@@ -58,6 +62,8 @@ function Badge({ value }: { value: string }) {
   );
 }
 export default function Workspace({ initial }: { initial: Campaign[] }) {
+  const [clock, setClock] = useState<number | null>(null);
+  useEffect(() => setClock(Date.now()), []);
   const [campaigns, setCampaigns] = useState(initial),
     [tab, setTab] = useState<Tab>("queue"),
     [selected, setSelected] = useState<string | null>(null),
@@ -525,7 +531,9 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
                             </td>
                             <td className="muted">
                               {c.submittedAt
-                                ? `${Math.max(0, Math.floor((Date.now() - Date.parse(c.submittedAt)) / 86400000))}d since submission`
+                                ? clock === null
+                                  ? date(c.submittedAt)
+                                  : `${Math.max(0, Math.floor((clock - Date.parse(c.submittedAt)) / 86400000))}d since submission`
                                 : `Draft · ${date(c.updatedAt)}`}
                             </td>
                             <td>

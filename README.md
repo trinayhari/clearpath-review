@@ -92,3 +92,7 @@ This is a 24-hour slice, not a legal compliance engine. Fictional policies are s
 The public sandbox uses ephemeral tab state to provide safe, frictionless evaluation without identity sharing. The authenticated backend is persistent but requires separately provisioned identities. Text diff shows complete before/after versions rather than token-level inline diff. Policy configuration is versioned in code, not an admin CRUD screen. All-time analytics derive from current records; no invented performance gains. No uploads, CSV, notifications, live monitoring, pagination, reviewer assignment or regulatory coverage claims. Rate limiting, enterprise SSO, retention and external observability are follow-up production hardening, not represented as completed.
 
 The Supabase CLI migration-creation command was attempted but could not initialize its readonly `/home/agent/.supabase` directory in this environment; a versioned migration file was therefore authored directly, tested locally, and applied via the authorized Supabase management connection. No CLI credentials were created or persistent access expanded.
+
+## Delivered instance
+
+Public demo: https://clearpath-review-livid.vercel.app · Source: https://github.com/trinayhari/clearpath-review . The owner explicitly approved public fictional source publication. See [verification evidence and remaining validation boundary](docs/VERIFICATION.md).

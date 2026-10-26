@@ -214,10 +214,12 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
       setBusy(false);
     }
   }
-  const queue = campaigns
+  const scopedCampaigns = live
+    ? campaigns.filter((c) => c.workspaceId === workspaceId)
+    : campaigns;
+  const queue = scopedCampaigns
     .filter(
       (c) =>
-        (!live || c.workspaceId === workspaceId) &&
         (filter === "All work" || c.status === filter) &&
         (productFilter === "All products" || c.product === productFilter) &&
         `${c.title} ${c.owner} ${c.product}`
@@ -229,11 +231,15 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
         (a.status === "In review" ? -1 : 1) -
         (b.status === "In review" ? -1 : 1),
     );
-  const inReview = campaigns.filter((c) => c.status === "In review").length;
-  const changes = campaigns.filter(
+  const inReview = scopedCampaigns.filter(
+    (c) => c.status === "In review",
+  ).length;
+  const changes = scopedCampaigns.filter(
     (c) => c.status === "Changes requested",
   ).length;
-  const approved = campaigns.filter((c) => c.status === "Approved").length;
+  const approved = scopedCampaigns.filter(
+    (c) => c.status === "Approved",
+  ).length;
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -474,7 +480,9 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
                       onClick={() => setFilter(s)}
                     >
                       {s === "In review" ? "Awaiting review" : s}
-                      {s === "All work" && <span>{campaigns.length}</span>}
+                      {s === "All work" && (
+                        <span>{scopedCampaigns.length}</span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -596,12 +604,12 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
                   <div className="empty">
                     <Search size={28} />
                     <h3>
-                      {campaigns.length
+                      {scopedCampaigns.length
                         ? "No campaigns match"
                         : "Your queue is clear"}
                     </h3>
                     <p>
-                      {campaigns.length
+                      {scopedCampaigns.length
                         ? "Try another search or reset your filters."
                         : "Create your first submission to begin the review workflow."}
                     </p>
@@ -856,7 +864,7 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
                     !historical && (
                       <Button
                         onClick={() => {
-                          setDecision("approve");
+                          setDecision("choose");
                           setNote("");
                         }}
                       >
@@ -1304,7 +1312,7 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
                 <div className="stat">
                   <span>Decision throughput</span>
                   <strong>
-                    {campaigns.filter((c) => c.decidedAt).length}
+                    {scopedCampaigns.filter((c) => c.decidedAt).length}
                     <small>campaigns with a latest-version decision</small>
                   </strong>
                 </div>
@@ -1319,7 +1327,7 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
                   <span>Average turnaround</span>
                   <strong>
                     {(() => {
-                      const cs = campaigns.filter(
+                      const cs = scopedCampaigns.filter(
                         (c) => c.decidedAt && c.submittedAt,
                       );
                       return cs.length
@@ -1345,14 +1353,16 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
                   <h2>Work by status</h2>
                   <p>Current campaigns · all time</p>
                   {statuses.map((s) => {
-                    const n = campaigns.filter((c) => c.status === s).length;
+                    const n = scopedCampaigns.filter(
+                      (c) => c.status === s,
+                    ).length;
                     return (
                       <div className="chart-row" key={s}>
                         <span>{s}</span>
                         <div>
                           <i
                             style={{
-                              width: `${campaigns.length ? (n / campaigns.length) * 100 : 0}%`,
+                              width: `${scopedCampaigns.length ? (n / scopedCampaigns.length) * 100 : 0}%`,
                             }}
                           />
                         </div>
@@ -1367,7 +1377,7 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
                   {policies
                     .map((p) => ({
                       p,
-                      n: campaigns.reduce(
+                      n: scopedCampaigns.reduce(
                         (n, c) =>
                           n +
                           c.versions
@@ -1464,9 +1474,13 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
             <label>
               Decision
               <select
+                aria-label="Decision"
                 value={decision}
                 onChange={(e) => setDecision(e.target.value)}
               >
+                <option value="choose" disabled>
+                  Choose a decision…
+                </option>
                 <option value="approve">Approve this version</option>
                 <option value="request_changes">Request changes</option>
                 <option value="reject">Reject this version</option>
@@ -1495,7 +1509,9 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
                 Cancel
               </Button>
               <Button
-                disabled={busy || note.trim().length < 3}
+                disabled={
+                  busy || decision === "choose" || note.trim().length < 3
+                }
                 onClick={() => act(decision, { note })}
               >
                 Confirm decision · v{latest.number}

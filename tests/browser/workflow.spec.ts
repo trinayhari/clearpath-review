@@ -50,6 +50,13 @@ test("complete isolated evaluator workflow and preserved approval history", asyn
   await page
     .getByLabel("Rationale")
     .fill("Verified the revised wording and product eligibility conditions.");
+  await expect(page.getByLabel("Decision", { exact: true })).toHaveValue(
+    "choose",
+  );
+  await expect(
+    page.getByRole("button", { name: "Confirm decision · v2" }),
+  ).toBeDisabled();
+  await page.getByLabel("Decision", { exact: true }).selectOption("approve");
   await page.getByRole("button", { name: "Confirm decision · v2" }).click();
   await expect(page.getByRole("status")).toContainText("Decision recorded");
   await page.getByRole("button", { name: "Activity", exact: true }).click();
@@ -99,4 +106,76 @@ test("queue filters, policy library, analytics, mobile layout and auth denial", 
       ).status,
   );
   expect([401, 403, 503]).toContain(status);
+});
+test("workspace switching scopes queue counters and analytics consistently", async ({
+  page,
+}) => {
+  const { seedCampaigns } = await import("../../lib/fixtures");
+  const seed = await seedCampaigns();
+  const campaigns = [
+    { ...seed[0], workspaceId: "one" },
+    { ...seed[3], workspaceId: "one" },
+    { ...seed[4], workspaceId: "two" },
+  ];
+  await page.route("**/api/workspace", (route) =>
+    route.fulfill({
+      json: {
+        userId: "evaluator",
+        members: [
+          { user_id: "evaluator", workspace_id: "one", role: "marketer" },
+          { user_id: "evaluator", workspace_id: "two", role: "reviewer" },
+        ],
+        workspaces: [
+          { id: "one", name: "Workspace one" },
+          { id: "two", name: "Workspace two" },
+        ],
+        campaigns,
+      },
+    }),
+  );
+  await page.goto("/?workspace=live");
+  await expect(page.getByLabel("Active workspace")).toHaveValue("one");
+  await expect(
+    page
+      .locator(".stat")
+      .filter({ hasText: "Awaiting review" })
+      .locator("strong"),
+  ).toContainText("1");
+  await expect(
+    page.locator(".stat").filter({ hasText: "Approved" }).locator("strong"),
+  ).toContainText("0");
+  await expect(page.locator("tbody tr")).toHaveCount(2);
+  await page.getByLabel("Active workspace").selectOption("two");
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await expect(
+    page
+      .locator(".stat")
+      .filter({ hasText: "Awaiting review" })
+      .locator("strong"),
+  ).toContainText("0");
+  await expect(
+    page.locator(".stat").filter({ hasText: "Approved" }).locator("strong"),
+  ).toContainText("1");
+  await expect(
+    page.getByRole("button", { name: "New submission" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Analytics", exact: true }).click();
+  await expect(
+    page
+      .locator(".stat")
+      .filter({ hasText: "Decision throughput" })
+      .locator("strong"),
+  ).toContainText("1");
+  await expect(
+    page
+      .locator(".chart-row")
+      .filter({ hasText: "Approved" })
+      .locator("strong"),
+  ).toHaveText("1");
+  await expect(
+    page
+      .locator(".chart-row")
+      .filter({ hasText: "In review" })
+      .locator("strong"),
+  ).toHaveText("0");
 });

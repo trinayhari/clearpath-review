@@ -14,7 +14,7 @@ A production-minded marketing compliance review vertical slice for **fictional C
 6. Switch to Maya and create v3. The campaign returns to Draft; v2 retains its historical approval, which does not apply to v3.
 7. Explore search, product/status filters, policy library and record-derived analytics. A new unchecked draft offers mock timeout/error controls; failures preserve copy.
 
-`/login` opens the separate authenticated workspace. Individual Supabase accounts and administrator-provisioned workspace memberships are required. There are **no shared passwords, anonymous reviewer accounts, client-side role overrides, service-role keys, or auth bypasses**. The public demo does not establish authenticated production approval verification.
+`/login` opens the separate authenticated workspace. Normal signup alone does **not** grant access to the seeded fictional workspace. The app does not expose signup or self-enrollment; even an identity created through Supabase remains without workspace access until an administrator inserts the membership below. Individual Supabase accounts and administrator-provisioned workspace memberships are required. There are **no shared passwords, anonymous reviewer accounts, client-side role overrides, service-role keys, or auth bypasses**. The public demo does not establish authenticated production approval verification.
 
 ## Stack and commands
 
@@ -97,3 +97,5 @@ The Supabase CLI migration-creation command was attempted but could not initiali
 ## Delivered instance
 
 Public demo: https://clearpath-review-livid.vercel.app · Source: https://github.com/trinayhari/clearpath-review . The owner explicitly approved public fictional source publication. See [verification evidence and remaining validation boundary](docs/VERIFICATION.md).
+
+Hosted workflow verification can also run `scripts/verify-hosted-rollback.sql` through an authorized management connection. It uses synthetic identity UUIDs and JWT claims inside one transaction, creates no passwords/sessions/invitations, and rolls back every fixture. This verifies hosted PostgreSQL workflow/RLS execution, **not** the email/password login or cookie-refresh path. Individual evaluator account provisioning remains required for that separate browser test.

@@ -1041,7 +1041,14 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
                               onClick={(e) => {
                                 e.preventDefault();
                                 setTab("policies");
-                                setSearch(f.policyId);
+                                requestAnimationFrame(() =>
+                                  document
+                                    .getElementById(f.policyId)
+                                    ?.scrollIntoView({
+                                      behavior: "smooth",
+                                      block: "center",
+                                    }),
+                                );
                               }}
                             >
                               {f.policyId}

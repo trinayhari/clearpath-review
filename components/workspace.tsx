@@ -26,6 +26,8 @@ import { Button } from "./ui/button";
 import { Modal } from "./ui/modal";
 import {
   applicablePolicies,
+  roleForWorkspace,
+  type Membership,
   contentSchema,
   mockProvider,
   policies,
@@ -62,6 +64,10 @@ function Badge({ value }: { value: string }) {
   );
 }
 export default function Workspace({ initial }: { initial: Campaign[] }) {
+  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [workspaces, setWorkspaces] = useState<{ id: string; name: string }[]>(
+    [],
+  );
   const [clock, setClock] = useState<number | null>(null);
   useEffect(() => setClock(Date.now()), []);
   const [campaigns, setCampaigns] = useState(initial),
@@ -103,11 +109,22 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
     if (!r.ok) throw new Error(data.error);
     setCampaigns(data.campaigns);
     setUserId(data.userId);
+    setMemberships(data.members);
+    setWorkspaces(data.workspaces);
+    const targetWorkspace =
+      workspaceId ||
+      data.members.find((m: Membership) => m.user_id === data.userId)
+        ?.workspace_id ||
+      "";
     const member = data.members.find(
-      (m: { user_id: string }) => m.user_id === data.userId,
+      (m: Membership) =>
+        m.user_id === data.userId && m.workspace_id === targetWorkspace,
     );
-    setRole(member?.role ?? "marketer");
-    setWorkspaceId(member?.workspace_id ?? "");
+    setRole(
+      roleForWorkspace(data.members, data.userId, targetWorkspace) ??
+        "marketer",
+    );
+    setWorkspaceId(targetWorkspace);
     if (!member)
       setNotice(
         "Your account is signed in. Ask your administrator to assign an evaluator workspace and role.",
@@ -122,6 +139,11 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
     }
   }, []);
   function open(c: Campaign) {
+    if (live)
+      setRole(
+        roleForWorkspace(memberships, userId, c.workspaceId ?? workspaceId) ??
+          "marketer",
+      );
     setSelected(c.id);
     setTab("review");
     setViewVersion(c.versions.length - 1);
@@ -195,6 +217,7 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
   const queue = campaigns
     .filter(
       (c) =>
+        (!live || c.workspaceId === workspaceId) &&
         (filter === "All work" || c.status === filter) &&
         (productFilter === "All products" || c.product === productFilter) &&
         `${c.title} ${c.owner} ${c.product}`
@@ -325,6 +348,30 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
               ? "Authenticated workspace · Fictional evaluator data"
               : "Interactive demo · Fictional data · Changes stay in this tab"}
           </span>
+          {live && (
+            <label>
+              Workspace{" "}
+              <select
+                aria-label="Active workspace"
+                value={workspaceId}
+                onChange={(e) => {
+                  setWorkspaceId(e.target.value);
+                  setRole(
+                    roleForWorkspace(memberships, userId, e.target.value) ??
+                      "marketer",
+                  );
+                  setTab("queue");
+                  setSelected(null);
+                }}
+              >
+                {workspaces.map((w) => (
+                  <option value={w.id} key={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           {!live && (
             <label>
               Explore as{" "}
@@ -779,6 +826,7 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
                   {editable &&
                     !historical &&
                     (content !== latest.content ||
+                    latest.assessmentWarning ||
                     ["Approved", "Rejected"].includes(current.status) ? (
                       <Button
                         disabled={busy}
@@ -912,6 +960,11 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
                     </span>
                   </div>
                 )}
+              {version.assessmentWarning && (
+                <div className="alert error" role="alert">
+                  {version.assessmentWarning}
+                </div>
+              )}
               <div className="review-grid">
                 <section className="panel content-panel">
                   <div className="panel-heading">

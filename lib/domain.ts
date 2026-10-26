@@ -36,6 +36,7 @@ export const findingSchema = z.object({
 });
 export type Finding = z.infer<typeof findingSchema>;
 export type Version = {
+  assessmentWarning?: string;
   id: string;
   number: number;
   content: string;
@@ -52,6 +53,7 @@ export type Event = {
   note?: string;
 };
 export type Campaign = {
+  workspaceId?: string;
   id: string;
   title: string;
   product: (typeof products)[number];
@@ -223,8 +225,10 @@ export const mockProvider: AnalysisProvider = {
           f.policyId === "CP-420"
             ? "https://www.ftc.gov/business-guidance/resources/ftcs-endorsement-guides-what-people-are-asking"
             : "https://www.ftc.gov/legal-library/browse/ftc-policy-statement-regarding-advertising-substantiation",
-        start: content.indexOf(f.evidence),
-        end: content.indexOf(f.evidence) + f.evidence.length,
+        start: Array.from(content.slice(0, content.indexOf(f.evidence))).length,
+        end: Array.from(
+          content.slice(0, content.indexOf(f.evidence) + f.evidence.length),
+        ).length,
       })),
       content,
       product,
@@ -241,7 +245,7 @@ export function validateFindings(
   if (
     parsed.some(
       (f) =>
-        content.slice(f.start, f.end) !== f.evidence ||
+        Array.from(content).slice(f.start, f.end).join("") !== f.evidence ||
         !applicable.includes(f.policyId) ||
         policies.find((p) => p.id === f.policyId)?.version !== f.policyVersion,
     )
@@ -272,5 +276,43 @@ export function assertTransition(
       throw new Error("Create a revision first.");
     if (action === "submit" && !c.versions.at(-1)?.analyzed)
       throw new Error("Run precheck before submitting.");
+  }
+}
+
+export type Membership = { user_id: string; workspace_id: string; role: Role };
+export function roleForWorkspace(
+  members: Membership[],
+  userId: string,
+  workspaceId: string,
+): Role | undefined {
+  return members.find(
+    (m) => m.user_id === userId && m.workspace_id === workspaceId,
+  )?.role;
+}
+export function safeAssessment(
+  record: unknown,
+  content: string,
+  product: string,
+): Pick<Version, "findings" | "analyzed" | "assessmentWarning"> {
+  if (!record) return { findings: [], analyzed: false };
+  try {
+    const a = z
+      .object({
+        trusted: z.literal(true),
+        provider: z.literal("deterministic-mock-v2-db"),
+        findings: z.unknown(),
+      })
+      .parse(record);
+    return {
+      findings: validateFindings(a.findings, content, product),
+      analyzed: true,
+    };
+  } catch {
+    return {
+      findings: [],
+      analyzed: false,
+      assessmentWarning:
+        "This assessment is unverified or malformed. Create a new version and rerun precheck.",
+    };
   }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverClient, configured } from "@/lib/supabase";
-import { contentSchema, mockProvider } from "@/lib/domain";
+import { contentSchema, safeAssessment } from "@/lib/domain";
 import { z } from "zod";
 const command = z.object({
   action: z.enum([
@@ -48,6 +48,7 @@ export async function GET() {
         workspaces,
         campaigns: campaigns.map((c) => ({
           id: c.id,
+          workspaceId: c.workspace_id,
           title: c.title,
           product: c.product,
           channel: c.channel,
@@ -67,9 +68,11 @@ export async function GET() {
               number: v.number,
               content: v.content,
               createdAt: v.created_at,
-              analyzed: analyses.some((a) => a.version_id === v.id),
-              findings:
-                analyses.find((a) => a.version_id === v.id)?.findings ?? [],
+              ...safeAssessment(
+                analyses.find((a) => a.version_id === v.id),
+                v.content,
+                c.product,
+              ),
             })),
           events: events
             .filter((e) => e.campaign_id === c.id)
@@ -135,22 +138,7 @@ export async function POST(req: NextRequest) {
       input.data = {
         note: z.string().trim().min(3).max(4000).parse(input.data.note),
       };
-    if (input.action === "analyze") {
-      const { data: v, error } = await db
-        .from("cp_versions")
-        .select("content,campaign_id")
-        .eq("id", input.versionId)
-        .single();
-      if (error || !v) throw new Error("Version is unavailable.");
-      const { data: c } = await db
-        .from("cp_campaigns")
-        .select("product")
-        .eq("id", v.campaign_id)
-        .single();
-      input.data = {
-        findings: await mockProvider.analyze(v.content, c!.product),
-      };
-    }
+    if (input.action === "analyze") input.data = {}; // Database computes trusted mock findings from stored copy.
     const { data, error } = await db.rpc("cp_command", {
       p_action: input.action,
       p_campaign: input.campaignId ?? null,

@@ -18,12 +18,11 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
     await db.query(
       `drop schema if exists public cascade;create schema public;drop schema if exists private cascade;drop schema if exists auth cascade;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;do $$begin if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin;end if;if not exists(select 1 from pg_roles where rolname='anon') then create role anon nologin;end if;end$$;grant usage on schema public,auth to authenticated,anon;grant execute on function auth.uid() to authenticated,anon;`,
     );
-    await db.query(
-      fs.readFileSync(
-        "supabase/migrations/20261026170000_review_workflow.sql",
-        "utf8",
-      ),
-    );
+    for (const file of fs
+      .readdirSync("supabase/migrations")
+      .filter((f) => f.endsWith(".sql"))
+      .sort())
+      await db.query(fs.readFileSync(`supabase/migrations/${file}`, "utf8"));
     await db.query(`insert into auth.users values($1),($2),($3);`, [
       uid(10),
       uid(11),
@@ -74,7 +73,10 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
     await t.test(
       "owner cannot submit without assessment",
       async () =>
-        await assert.rejects(cmd("submit", cid, v1), /Precheck required/),
+        await assert.rejects(
+          cmd("submit", cid, v1),
+          /Trusted precheck required/,
+        ),
     );
     await t.test("direct writes and immutable tampering denied", async () => {
       await assert.rejects(
@@ -102,10 +104,26 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
               { evidence: "fabricated", policyId: "CP-101", severity: "High" },
             ],
           }),
-          /Invalid finding/,
+          /Client-supplied findings/,
         ),
     );
-    await cmd("analyze", cid, v1, { findings: [] });
+    await assert.rejects(
+      cmd("analyze", cid, v1, { findings: [] }),
+      /Client-supplied findings/,
+    );
+    await cmd("analyze", cid, v1);
+    const persisted = (
+      await db.query("select findings from cp_analyses where version_id=$1", [
+        v1,
+      ])
+    ).rows[0].findings;
+    assert.ok(
+      persisted.some((f: { policyId: string }) => f.policyId === "CP-101"),
+    );
+    assert.equal(
+      persisted[0].evidence,
+      "Get guaranteed approval with your personal loan today.",
+    );
     await cmd("submit", cid, v1);
     await t.test(
       "marketer cannot approve",
@@ -160,7 +178,7 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
         cid,
       ])
     ).rows[0].current_version;
-    await cmd("analyze", cid, v2, { findings: [] });
+    await cmd("analyze", cid, v2);
     await cmd("submit", cid, v2);
     await as(11);
     await t.test(
@@ -219,6 +237,114 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
         );
       },
     );
+    await t.test(
+      "database-generated findings pass full output validation for every product",
+      async () => {
+        const { safeAssessment } = await import("../lib/domain");
+        for (const [product, copy] of [
+          [
+            "Personal loans",
+            "🌱 A brighter future. Get guaranteed approval at 7.99% APR. Act now!",
+          ],
+          [
+            "Mortgage",
+            "Find a home. Get pre-approved for your mortgage in minutes.",
+          ],
+          [
+            "Affiliate",
+            "Compare our partner options and find a financial product that suits you.",
+          ],
+          [
+            "Credit cards",
+            "Enjoy 3% cash back with no annual fee. Terms apply.",
+          ],
+        ]) {
+          const findings = (
+            await db.query("select private.cp_mock_analysis($1,$2) findings", [
+              copy,
+              product,
+            ])
+          ).rows[0].findings;
+          const checked = safeAssessment(
+            { trusted: true, provider: "deterministic-mock-v2-db", findings },
+            copy,
+            product,
+          );
+          assert.equal(checked.analyzed, true, product);
+          assert.ok(checked.findings.length > 0, product);
+        }
+      },
+    );
+    await as(10);
+    const legacyId = await cmd("create", null, null, {
+      workspaceId: uid(1),
+      title: "Legacy assessment fixture",
+      product: "Personal loans",
+      channel: "Email",
+      content:
+        "Everyone qualifies for a personal loan. Explore our options today.",
+    });
+    const legacyVersion = (
+      await db.query("select current_version from cp_campaigns where id=$1", [
+        legacyId,
+      ])
+    ).rows[0].current_version;
+    await t.test(
+      "direct RPC rejects empty and malformed caller assessment payloads",
+      async () => {
+        for (const findings of [
+          [],
+          [
+            {
+              title: { object: "child" },
+              evidence: "Everyone qualifies",
+              policyId: "CP-101",
+              severity: "High",
+              rationale: { object: "child" },
+              replacement: { object: "child" },
+            },
+          ],
+        ])
+          await assert.rejects(
+            cmd("analyze", legacyId, legacyVersion, { findings }),
+            /Client-supplied findings/,
+          );
+        assert.equal(
+          (
+            await db.query("select * from cp_analyses where version_id=$1", [
+              legacyVersion,
+            ])
+          ).rowCount,
+          0,
+        );
+      },
+    );
+    await db.query("reset role");
+    await db.query(
+      "insert into cp_analyses(version_id,findings,provider) values($1,'[]','deterministic-mock-v1')",
+      [legacyVersion],
+    );
+    await as(10);
+    await t.test(
+      "legacy assessments cannot authorize submission or approval",
+      async () => {
+        await assert.rejects(
+          cmd("submit", legacyId, legacyVersion),
+          /Trusted precheck required/,
+        );
+        await db.query("reset role");
+        await db.query(
+          "update cp_campaigns set status='In review' where id=$1",
+          [legacyId],
+        );
+        await as(11);
+        await assert.rejects(
+          cmd("approve", legacyId, legacyVersion, { note: "Legacy approval" }),
+          /Trusted precheck required/,
+        );
+      },
+    );
+    await db.query("reset role");
     await db.query("set role anon");
     await t.test("anonymous access denied", async () => {
       await assert.rejects(

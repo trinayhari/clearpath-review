@@ -117,3 +117,55 @@ test("proposed edits replace whole sentences without grammatical fragments", asy
     "Find a place to call home. Explore mortgage prequalification. This is not a commitment to lend. Explore flexible options with ClearPath.",
   );
 });
+test("read boundary quarantines malformed and untrusted persisted assessments", async () => {
+  const { safeAssessment } = await import("../lib/domain");
+  const copy = "Get guaranteed approval for your personal loan today.";
+  const valid = await mockProvider.analyze(copy, "Personal loans");
+  assert.equal(
+    safeAssessment(
+      { trusted: true, provider: "deterministic-mock-v2-db", findings: valid },
+      copy,
+      "Personal loans",
+    ).analyzed,
+    true,
+  );
+  assert.equal(
+    safeAssessment(
+      { trusted: false, provider: "deterministic-mock-v1", findings: [] },
+      copy,
+      "Personal loans",
+    ).analyzed,
+    false,
+  );
+  for (const key of ["title", "rationale", "replacement"]) {
+    const bad = structuredClone(valid);
+    (bad[0] as unknown as Record<string, unknown>)[key] = {
+      malicious: "object child",
+    };
+    const result = safeAssessment(
+      { trusted: true, provider: "deterministic-mock-v2-db", findings: bad },
+      copy,
+      "Personal loans",
+    );
+    assert.equal(result.analyzed, false);
+    assert.deepEqual(result.findings, []);
+    assert.ok(result.assessmentWarning);
+  }
+});
+test("role display resolves membership for the selected workspace", async () => {
+  const { roleForWorkspace } = await import("../lib/domain");
+  const members = [
+    { user_id: "a", workspace_id: "one", role: "marketer" as const },
+    { user_id: "a", workspace_id: "two", role: "reviewer" as const },
+    { user_id: "b", workspace_id: "two", role: "marketer" as const },
+  ];
+  assert.equal(roleForWorkspace(members, "a", "one"), "marketer");
+  assert.equal(roleForWorkspace(members, "a", "two"), "reviewer");
+  assert.equal(roleForWorkspace(members, "a", "other"), undefined);
+});
+test("Unicode evidence offsets are verified as code points", async () => {
+  const copy =
+    "🌱 A brighter future. Get guaranteed approval with ClearPath today.";
+  const findings = await mockProvider.analyze(copy, "Personal loans");
+  assert.equal(validateFindings(findings, copy, "Personal loans").length, 1);
+});

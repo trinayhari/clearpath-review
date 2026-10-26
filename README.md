@@ -33,7 +33,7 @@ The public demo works without environment variables. Authenticated endpoints fai
 
 ## Database setup and evaluator roles
 
-Migration: `supabase/migrations/20261026170000_review_workflow.sql`. Seed: `supabase/seed.sql` creates only a fictional workspace, never accounts or credentials.
+Migrations: `supabase/migrations/20261026170000_review_workflow.sql` and `supabase/migrations/20261026172000_database_owned_assessments.sql` (apply both in order). Seed: `supabase/seed.sql` creates only a fictional workspace, never accounts or credentials.
 
 Apply the migration to a dedicated Supabase project with the CLI or an authorized management connection. Never run test bootstrap SQL on a deployed database. The migration was verified against isolated PostgreSQL 17 and applied to project `tztlatsflqjlfadipguu`. All six public tables have RLS enabled. Supabase security advisors returned no findings after application.
 
@@ -52,12 +52,13 @@ For isolated evaluation groups, create a separate `cp_workspaces` row and provis
 
 - `lib/domain.ts`: bounded Zod input/output contracts, deterministic `AnalysisProvider` interface, applicable fictional policies, exact evidence offsets, policy version/source metadata, mock error paths. Content is data; prompt injection cannot change instructions or authorize workflow actions.
 - `lib/fixtures.ts`: rich fictional sandbox cases and isolated simulation reducer. Sandbox logic is not the security boundary.
-- `app/api/workspace`: authenticates each request, validates inputs, runs mock precheck on the stored version, and calls a user-scoped PostgreSQL RPC. Same-origin checks protect cookie-authenticated mutations.
+- `app/api/workspace`: authenticates each request, validates inputs, requests a database-owned mock precheck on the stored version, and calls a user-scoped PostgreSQL RPC. Same-origin checks protect cookie-authenticated mutations.
 - PostgreSQL is authoritative. `cp_command` is a security-invoker public wrapper around a private, least-granted security-definer implementation with an empty `search_path`, explicit identity/membership/role/ownership checks, and campaign row locking. It rejects stale version IDs, self-review, illegal transitions, and duplicate decisions.
 - Every mutation creates an actor/version-linked event in the same transaction. Versions, analyses, and events cannot be updated/deleted, including through direct owner SQL because immutability triggers reject them. Table writes are revoked from application roles. A unique partial index permits one decision per version.
 - Read policies scope all campaigns and child records to workspace membership. Anonymous users have no table or RPC access. There are no views or public definer functions.
 - Only a marketer owning a campaign can create revisions, precheck and submit. Only an independent reviewer can decide an In review version. A submitted version is locked. Revising an Approved/Rejected campaign creates a new Draft and retains the previous decision as historical.
-- Assessments are untrusted guidance. Regex matches can miss context; product terms are explicitly unverifiable. The database verifies quoted evidence and policy applicability, but an authorized owner could submit their own assessment via RPC; **no assessment grants approval**. A future trusted external analysis pipeline should have a narrowly scoped service identity and provenance signature if tamper-proof AI provenance is required.
+- Assessments are guidance, never approval. Persisted mock findings are generated inside PostgreSQL from the locked stored version; the RPC rejects all caller-supplied findings, including empty arrays. The private generator has no application-role execution grant. Its results are stored as `deterministic-mock-v2-db` with trusted provenance. Submission and approval require this provenance. Legacy assessments remain immutable and untrusted; create a revision to replace them. The API validates the full finding schema, policy version and exact evidence offsets before rendering, and quarantines malformed/untrusted rows instead of crashing the workspace.
+- The isolated browser demo uses the TypeScript `AnalysisProvider`; persistence uses a database-owned equivalent. Tests validate both outputs. A future external provider needs a narrowly authorized trusted write boundary; users must never be able to label arbitrary results as provider output.
 
 ## Tests
 

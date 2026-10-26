@@ -9,7 +9,7 @@
 
 - Production Next.js build and TypeScript checks pass.
 - 26 domain/database tests pass against a dedicated PostgreSQL 17 container. The tests use real RLS, grants, triggers, row locks and two concurrent database connections; only Supabase's identity function is represented by a local test adapter.
-- Three Playwright browser scenarios pass locally and against the public production alias: create draft, timeout recovery preserving content, evidence review, preview/edit, immutable v2, fresh precheck, submission lock, reviewer decision, v3 invalidating current approval while retaining historical v2 approval; search/reset, policy library, analytics, mobile layout and anonymous API rejection.
+- Four Playwright browser scenarios pass locally and against the public production alias: create draft, timeout recovery preserving content, evidence review, preview/edit, immutable v2, fresh precheck, submission lock, reviewer decision, v3 invalidating current approval while retaining historical v2 approval; search/reset, policy library, analytics, mobile layout and anonymous API rejection.
 - The third browser scenario uses intercepted fictional API fixtures to verify workspace-scoped counters, analytics, and role display; it is not an Auth login test. The decision modal requires an explicit choice even after a rationale is entered. Browser workflow checks no uncaught page errors. Screenshots are committed under `artifacts/`.
 - A separate design reviewer inspected the rendered interface and full version lifecycle. Findings were addressed: mobile status/risk visibility, stronger text contrast, sentence-aware replacement and full-copy preview, historical decision context, no claim of resolved findings before recheck, native modal focus/Escape support.
 - Hosted Supabase RLS verification: an authenticated nonmember sees zero workspaces/campaigns/versions/events. Anonymous SELECT and RPC execution privileges are false; authenticated UPDATE privileges on audit/version tables are false. All six public tables have RLS enabled. Security advisor returns no findings.
@@ -33,3 +33,7 @@ The initial assessment RPC accepted owner-supplied findings. This was fixed with
 ## Rollback verification script
 
 `scripts/verify-hosted-rollback.sql` passes against the isolated local PostgreSQL instance. The hosted connector attempt returned `Invalid or expired requestState`; no hosted positive-workflow success is claimed from that attempt. A subsequent hosted count confirmed zero memberships, campaigns, and assessments. The script is available for a fresh authorized management call; all synthetic identities and workflow records are transaction-local and rolled back, with no credentials or sessions created.
+
+## Bounded design audit completion
+
+Explicit modal focus wrapping/restoration, dialog names, form label associations, exact policy navigation/return context, horizontal-only tab strips and measured text contrast are documented in [ACCESSIBILITY-CHECKS.md](ACCESSIBILITY-CHECKS.md). All 27 sampled queue/review text styles exceed 4.5:1 after adjustment; this is not a complete accessibility certification.

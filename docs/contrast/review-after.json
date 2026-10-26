@@ -1,0 +1,68 @@
+[
+  {
+    "selector": ".review-meta",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(248, 249, 251)",
+    "ratio": 5.47
+  },
+  {
+    "selector": ".version-bar",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(248, 249, 251)",
+    "ratio": 5.47
+  },
+  {
+    "selector": ".finding-top",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(255, 255, 255)",
+    "ratio": 5.76
+  },
+  {
+    "selector": ".finding-top a",
+    "color": "rgb(53, 84, 160)",
+    "background": "rgb(255, 255, 255)",
+    "ratio": 7.17
+  },
+  {
+    "selector": ".finding>p",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(255, 255, 255)",
+    "ratio": 5.76
+  },
+  {
+    "selector": ".analysis-summary p",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(255, 255, 255)",
+    "ratio": 5.76
+  },
+  {
+    "selector": ".copy-meta",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(255, 255, 255)",
+    "ratio": 5.76
+  },
+  {
+    "selector": ".copy-foot",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(255, 255, 255)",
+    "ratio": 5.76
+  },
+  {
+    "selector": ".uncertainty",
+    "color": "rgb(128, 96, 31)",
+    "background": "rgb(250, 248, 242)",
+    "ratio": 5.48
+  },
+  {
+    "selector": ".suggestion small",
+    "color": "rgb(53, 102, 78)",
+    "background": "rgb(246, 249, 247)",
+    "ratio": 6.27
+  },
+  {
+    "selector": ".suggestion p",
+    "color": "rgb(53, 102, 78)",
+    "background": "rgb(246, 249, 247)",
+    "ratio": 6.27
+  }
+]

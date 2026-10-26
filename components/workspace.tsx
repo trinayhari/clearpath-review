@@ -64,6 +64,7 @@ function Badge({ value }: { value: string }) {
   );
 }
 export default function Workspace({ initial }: { initial: Campaign[] }) {
+  const [policyContext, setPolicyContext] = useState<string | null>(null);
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [workspaces, setWorkspaces] = useState<{ id: string; name: string }[]>(
     [],
@@ -91,6 +92,13 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
     [decision, setDecision] = useState<string | null>(null),
     [highlight, setHighlight] = useState(""),
     [failure, setFailure] = useState<"normal" | "timeout" | "error">("normal");
+  useEffect(() => {
+    if (tab === "policies" && policyContext) {
+      const rule = document.getElementById(policyContext);
+      rule?.focus({ preventScroll: true });
+      rule?.scrollIntoView({ block: "center" });
+    }
+  }, [tab, policyContext]);
   const current = campaigns.find((c) => c.id === selected);
   const latest = current?.versions.at(-1);
   const version = current?.versions[viewVersion] ?? latest;
@@ -268,6 +276,7 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
               key={id}
               className={`nav-item ${tab === id || (id === "queue" && ["new", "review"].includes(tab)) ? "active" : ""}`}
               onClick={() => {
+                setPolicyContext(null);
                 setTab(id);
                 setError("");
                 setNotice("");
@@ -1098,18 +1107,13 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
                                 : "Rule match"}
                             </span>
                             <a
-                              href="#policy"
+                              href={`#${f.policyId}`}
+                              data-policy-id={f.policyId}
+                              aria-label={`View ${f.policyId}: ${policies.find((p) => p.id === f.policyId)?.title}, fictional policy version ${f.policyVersion}`}
                               onClick={(e) => {
                                 e.preventDefault();
+                                setPolicyContext(f.policyId);
                                 setTab("policies");
-                                requestAnimationFrame(() =>
-                                  document
-                                    .getElementById(f.policyId)
-                                    ?.scrollIntoView({
-                                      behavior: "smooth",
-                                      block: "center",
-                                    }),
-                                );
                               }}
                             >
                               {f.policyId}
@@ -1260,6 +1264,24 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
           )}
           {tab === "policies" && (
             <>
+              {policyContext && current && (
+                <button
+                  className="back"
+                  onClick={() => {
+                    setTab("review");
+                    requestAnimationFrame(() =>
+                      document
+                        .querySelector<HTMLElement>(
+                          `[data-policy-id="${policyContext}"]`,
+                        )
+                        ?.focus(),
+                    );
+                  }}
+                >
+                  <ArrowLeft size={15} />
+                  Return to review · {current.title}
+                </button>
+              )}
               <div className="page-heading">
                 <div className="eyebrow">A SHARED STANDARD</div>
                 <h1>Policy library</h1>
@@ -1280,7 +1302,13 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
               </div>
               <div className="policy-list">
                 {policies.map((p) => (
-                  <article className="panel policy" id={p.id} key={p.id}>
+                  <article
+                    className={`panel policy ${policyContext === p.id ? "policy-selected" : ""}`}
+                    id={p.id}
+                    key={p.id}
+                    tabIndex={-1}
+                    aria-label={`${p.id}: ${p.title}`}
+                  >
                     <span className="policy-icon">
                       <BookOpen size={22} />
                     </span>
@@ -1408,7 +1436,7 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
         </main>
       </div>
       {preview && current && latest && (
-        <Modal onClose={() => setPreview(null)}>
+        <Modal labelledBy="edit-title" onClose={() => setPreview(null)}>
           <section className="modal panel" aria-labelledby="edit-title">
             <button
               className="modal-close"
@@ -1455,7 +1483,7 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
         </Modal>
       )}
       {decision && current && latest && (
-        <Modal onClose={() => setDecision(null)}>
+        <Modal labelledBy="decision-title" onClose={() => setDecision(null)}>
           <section className="modal panel" aria-labelledby="decision-title">
             <button
               className="modal-close"
@@ -1471,9 +1499,10 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
               {latest.findings.length} mock findings to consider. You are
               responsible for verifying product terms and disclosures.
             </div>
-            <label>
+            <label htmlFor="review-decision">
               Decision
               <select
+                id="review-decision"
                 aria-label="Decision"
                 value={decision}
                 onChange={(e) => setDecision(e.target.value)}
@@ -1486,9 +1515,10 @@ export default function Workspace({ initial }: { initial: Campaign[] }) {
                 <option value="reject">Reject this version</option>
               </select>
             </label>
-            <label>
+            <label htmlFor="decision-rationale">
               Rationale
               <textarea
+                id="decision-rationale"
                 autoFocus
                 value={note}
                 onChange={(e) => setNote(e.target.value)}

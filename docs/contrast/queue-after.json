@@ -1,0 +1,98 @@
+[
+  {
+    "selector": ".page-heading p",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(248, 249, 251)",
+    "ratio": 5.47
+  },
+  {
+    "selector": ".stat small",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(255, 255, 255)",
+    "ratio": 5.76
+  },
+  {
+    "selector": ".campaign-link small",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(255, 255, 255)",
+    "ratio": 5.76
+  },
+  {
+    "selector": "th",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(250, 251, 252)",
+    "ratio": 5.56
+  },
+  {
+    "selector": ".owner",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(255, 255, 255)",
+    "ratio": 5.76
+  },
+  {
+    "selector": ".table-footer",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(253, 253, 254)",
+    "ratio": 5.67
+  },
+  {
+    "selector": ".subtle-footer",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(248, 249, 251)",
+    "ratio": 5.47
+  },
+  {
+    "selector": ".demo-strip",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(244, 246, 252)",
+    "ratio": 5.33
+  },
+  {
+    "selector": ".nav-label",
+    "color": "rgb(88, 103, 124)",
+    "background": "rgb(252, 252, 253)",
+    "ratio": 5.62
+  },
+  {
+    "selector": ".queue-tabs button",
+    "color": "rgb(53, 91, 203)",
+    "background": "rgb(255, 255, 255)",
+    "ratio": 5.98
+  },
+  {
+    "selector": ".risk-high",
+    "color": "rgb(157, 65, 64)",
+    "background": "rgb(255, 255, 255)",
+    "ratio": 6.43
+  },
+  {
+    "selector": ".risk-medium",
+    "color": "rgb(128, 96, 31)",
+    "background": "rgb(255, 255, 255)",
+    "ratio": 5.82
+  },
+  {
+    "selector": ".badge.in-review",
+    "color": "rgb(53, 84, 160)",
+    "background": "rgb(242, 245, 255)",
+    "ratio": 6.59
+  },
+  {
+    "selector": ".badge.changes-requested",
+    "color": "rgb(128, 96, 31)",
+    "background": "rgb(255, 251, 241)",
+    "ratio": 5.63
+  },
+  {
+    "selector": ".badge.approved",
+    "color": "rgb(53, 102, 78)",
+    "background": "rgb(242, 250, 246)",
+    "ratio": 6.26
+  },
+  {
+    "selector": ".badge.rejected",
+    "color": "rgb(157, 65, 64)",
+    "background": "rgb(255, 245, 245)",
+    "ratio": 6.01
+  }
+]

@@ -1780,3 +1780,102 @@ mark {
   line-height: 1.9;
   margin-top: 8px;
 }
+/* Bounded contrast and keyboard audit: measured secondary copy and status labels. */
+.queue-tabs,
+.detail-tabs {
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-wrap: nowrap;
+}
+.queue-tabs button:focus-visible,
+.detail-tabs button:focus-visible {
+  outline-offset: -3px;
+}
+.page-heading p,
+.stat small,
+.campaign-link small,
+th,
+.owner,
+.table-footer,
+.subtle-footer,
+.demo-strip,
+.nav-label,
+.muted,
+.copy-meta,
+.review-meta,
+.panel-heading span,
+.chart > p,
+.policy-meta,
+.copy-foot,
+.analysis-summary p,
+.finding > p,
+.policy p,
+.timeline small,
+.comment > small,
+.comment strong small,
+.eyebrow,
+.guidance p,
+.guidance li span,
+.guidance > small,
+.safe-note,
+.version-bar,
+.modal > p,
+.decision-context,
+.finding-top {
+  color: #58677c;
+}
+.queue-tabs button:not(.selected),
+.detail-tabs button:not(.selected) {
+  color: #58677c !important;
+}
+.badge {
+  color: #58677c;
+}
+.badge.in-review {
+  color: #3554a0;
+}
+.badge.changes-requested,
+.badge.medium {
+  color: #80601f;
+}
+.badge.approved,
+.badge.low {
+  color: #35664e;
+}
+.badge.rejected,
+.badge.high {
+  color: #9d4140;
+}
+.risk-high {
+  color: #9d4140;
+}
+.risk-medium {
+  color: #80601f;
+}
+.policy-selected {
+  border-color: #5374ce;
+  box-shadow: 0 0 0 2px #dce5ff;
+}
+.policy:focus-visible {
+  outline: 2px solid #355bdb;
+  outline-offset: 3px;
+}
+.finding-top a {
+  color: #3554a0;
+}
+.uncertainty {
+  color: #80601f;
+}
+.suggestion small,
+.suggestion p {
+  color: #35664e;
+}
+.evidence {
+  color: #735c39 !important;
+}
+.version-status {
+  color: #58677c;
+}
+.mock-label {
+  color: #4b5b85;
+}

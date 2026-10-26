@@ -179,3 +179,78 @@ test("workspace switching scopes queue counters and analytics consistently", asy
       .locator("strong"),
   ).toHaveText("0");
 });
+test("review dialogs trap keyboard focus, restore their trigger, and policy citations preserve review context", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /A little breathing room/ }).click();
+  const citation = page.getByRole("link", { name: /View CP-101:/ });
+  await citation.click();
+  await expect(page.locator("#CP-101")).toBeFocused();
+  await expect(page.locator("#CP-101")).toHaveClass(/policy-selected/);
+  await page.getByRole("button", { name: /Return to review/ }).click();
+  await expect(citation).toBeFocused();
+  await expect(
+    page.getByRole("heading", { name: "A little breathing room", exact: true }),
+  ).toBeVisible();
+  for (const strip of await page.locator(".detail-tabs").all()) {
+    expect(await strip.evaluate((el) => getComputedStyle(el).overflowY)).toBe(
+      "hidden",
+    );
+    expect(await strip.evaluate((el) => getComputedStyle(el).flexWrap)).toBe(
+      "nowrap",
+    );
+  }
+  await page.getByLabel("Demo role").selectOption("reviewer");
+  const trigger = page.getByRole("button", {
+    name: "Record decision",
+    exact: true,
+  });
+  await trigger.click();
+  const dialog = page.getByRole("dialog", { name: "Record a decision on v1" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('label[for="review-decision"]')).toHaveText(
+    /Decision/,
+  );
+  await expect(dialog.locator('label[for="decision-rationale"]')).toHaveText(
+    /Rationale/,
+  );
+  const close = page.getByRole("button", { name: "Close decision" }),
+    cancel = dialog.getByRole("button", { name: "Cancel", exact: true });
+  await close.focus();
+  await page.keyboard.press("Shift+Tab");
+  await expect(cancel).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(close).toBeFocused();
+  await page
+    .getByLabel("Rationale")
+    .fill("Reviewed the exact version and verified remaining terms.");
+  await page.getByLabel("Decision", { exact: true }).selectOption("approve");
+  const confirm = page.getByRole("button", { name: "Confirm decision · v1" });
+  await close.focus();
+  await page.keyboard.press("Shift+Tab");
+  await expect(confirm).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(close).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await page.getByRole("button", { name: "Close decision" }).click();
+  await expect(trigger).toBeFocused();
+  await trigger.click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await expect(trigger).toBeFocused();
+  await page
+    .getByRole("button", { name: "Review queue", exact: false })
+    .first()
+    .click();
+  expect(
+    await page
+      .locator(".queue-tabs")
+      .evaluate((el) => getComputedStyle(el).overflowY),
+  ).toBe("hidden");
+});

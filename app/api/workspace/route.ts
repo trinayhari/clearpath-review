@@ -18,6 +18,7 @@ const command = z.object({
     "revise",
     "analyze",
     "submit",
+    "assign",
     "comment",
     "approve",
     "reject",
@@ -57,7 +58,12 @@ export async function GET() {
         analysisMode: "mock",
         userId: user.id,
         email: user.email,
-        members,
+        members: members.map((m) => ({
+          ...m,
+          is_admin: workspaces.some(
+            (w) => w.id === m.workspace_id && w.owner_id === m.user_id,
+          ),
+        })),
         workspaces: workspaces.map((w) => ({
           ...w,
           analysisMode: liveAnalysisForWorkspace(w.id) ? "openai" : "mock",
@@ -70,6 +76,11 @@ export async function GET() {
           channel: c.channel,
           status: c.status,
           ownerId: c.owner_id,
+          reviewerId: c.reviewer_id ?? undefined,
+          reviewer: members.find(
+            (m) =>
+              m.user_id === c.reviewer_id && m.workspace_id === c.workspace_id,
+          )?.display_name,
           owner:
             members.find(
               (m) =>
@@ -158,6 +169,12 @@ export async function POST(req: NextRequest) {
     )
       input.data = {
         note: z.string().trim().min(3).max(4000).parse(input.data.note),
+      };
+    if (input.action === "assign")
+      input.data = { reviewerId: z.uuid().parse(input.data.reviewerId) };
+    if (input.action === "submit")
+      input.data = {
+        reviewerId: z.uuid().optional().parse(input.data.reviewerId),
       };
     let useLiveAnalysis = false;
     if (

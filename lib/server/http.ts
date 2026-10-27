@@ -48,6 +48,53 @@ export async function readJsonBody(
   }
 }
 const workflowMessages: Record<string, { status: number; message: string }> = {
+  "Team owner required": {
+    status: 403,
+    message: "Only the team owner can manage this team or invite people.",
+  },
+  "Campaign owner or team owner required": {
+    status: 403,
+    message: "Only the submission owner or team owner can assign its reviewer.",
+  },
+  "Assigned reviewer required": {
+    status: 403,
+    message: "Only the assigned compliance reviewer can record this decision.",
+  },
+  "Choose a compliance reviewer from this team": {
+    status: 400,
+    message:
+      "Choose a compliance reviewer from this team. Invite a reviewer in Teams if none are available.",
+  },
+  "Invite is invalid, expired or already used": {
+    status: 400,
+    message:
+      "This invitation is invalid, expired or already used. Ask the team owner for a new invitation.",
+  },
+  "You already belong to this team": {
+    status: 409,
+    message:
+      "You already belong to this team. Your current role has not changed.",
+  },
+  "Invite not found": {
+    status: 404,
+    message: "This invitation is unavailable.",
+  },
+  "Team name must be 2 to 80 characters": {
+    status: 400,
+    message: "Enter a team name of 2 to 80 characters.",
+  },
+  "Display name must be 2 to 80 characters": {
+    status: 400,
+    message: "Enter a display name of 2 to 80 characters.",
+  },
+  "Invalid team role": {
+    status: 400,
+    message: "Choose Marketing or Compliance reviewer.",
+  },
+  "Authenticated account required": {
+    status: 401,
+    message: "Sign in with your own account to continue.",
+  },
   "Live analysis is not enabled": {
     status: 503,
     message: "Live analysis is not enabled for this workspace.",

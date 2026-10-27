@@ -21,9 +21,11 @@ import {
   ShieldCheck,
   Sparkles,
   X,
+  Users,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/modal";
+import { TeamPanel } from "./team-panel";
 import {
   applicablePolicies,
   roleForWorkspace,
@@ -38,7 +40,7 @@ import {
   type Role,
 } from "@/lib/domain";
 import { demoCommand } from "@/lib/fixtures";
-type Tab = "queue" | "policies" | "analytics" | "new" | "review";
+type Tab = "queue" | "policies" | "analytics" | "new" | "review" | "team";
 const actionLabels: Record<string, string> = {
   create: "created the campaign",
   revise: "saved a new version",
@@ -48,6 +50,7 @@ const actionLabels: Record<string, string> = {
   reject: "rejected this version",
   request_changes: "requested changes",
   comment: "commented",
+  assign: "assigned a reviewer",
 };
 const date = (s: string) =>
   new Date(s).toLocaleDateString("en-US", {
@@ -85,10 +88,44 @@ export default function Workspace({
     content: "",
   });
   const [policyContext, setPolicyContext] = useState<string | null>(null);
-  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [memberships, setMemberships] = useState<Membership[]>(
+    mode === "live"
+      ? []
+      : [
+          {
+            workspace_id: "demo-team",
+            user_id: "demo-maya",
+            role: "marketer",
+            display_name: "Maya Chen",
+          },
+          {
+            workspace_id: "demo-team",
+            user_id: "demo-alex",
+            role: "reviewer",
+            display_name: "Alex Morgan",
+          },
+        ],
+  );
+  const [reviewerChoice, setReviewerChoice] = useState("");
+  const [previewReviewerId, setPreviewReviewerId] = useState("demo-alex");
   const [workspaces, setWorkspaces] = useState<
-    { id: string; name: string; analysisMode?: "mock" | "openai" }[]
-  >([]);
+    {
+      id: string;
+      name: string;
+      owner_id?: string;
+      analysisMode?: "mock" | "openai";
+    }[]
+  >(
+    mode === "live"
+      ? []
+      : [
+          {
+            id: "demo-team",
+            name: "ClearPath Financial",
+            owner_id: "demo-maya",
+          },
+        ],
+  );
   const [clock, setClock] = useState<number | null>(null);
   useEffect(() => setClock(Date.now()), []);
   const [campaigns, setCampaigns] = useState(initial),
@@ -96,8 +133,10 @@ export default function Workspace({
     [selected, setSelected] = useState<string | null>(null),
     [role, setRole] = useState<Role>("marketer"),
     [live, setLive] = useState(mode === "live"),
-    [workspaceId, setWorkspaceId] = useState(""),
-    [userId, setUserId] = useState(""),
+    [workspaceId, setWorkspaceId] = useState(
+      mode === "live" ? "" : "demo-team",
+    ),
+    [userId, setUserId] = useState(mode === "live" ? "" : "demo-maya"),
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState("All work"),
     [productFilter, setProductFilter] = useState("All products"),
@@ -138,7 +177,7 @@ export default function Workspace({
       current.status,
     ),
   );
-  async function load() {
+  async function load(preferredWorkspace?: string) {
     if (mode === "live") {
       const initialized = await fetch("/api/auth", {
         method: "POST",
@@ -169,7 +208,10 @@ export default function Workspace({
     setMemberships(data.members);
     setWorkspaces(data.workspaces);
     const targetWorkspace =
-      workspaceId ||
+      preferredWorkspace ||
+      (data.workspaces.some((w: { id: string }) => w.id === workspaceId)
+        ? workspaceId
+        : "") ||
       data.members.find((m: Membership) => m.user_id === data.userId)
         ?.workspace_id ||
       "";
@@ -193,13 +235,13 @@ export default function Workspace({
       name: member?.display_name || data.email || "Your account",
       email: data.email || "",
     });
-    if (!workspaceId)
+    if (!data.workspaces.some((w: { id: string }) => w.id === workspaceId))
       setFilter(member?.role === "reviewer" ? "In review" : "My work");
     const requested = new URLSearchParams(location.search).get("campaign");
     const requestedCampaign = (data.campaigns as Campaign[]).find(
       (c) => c.id === requested,
     );
-    if (!selected && requestedCampaign) {
+    if (!preferredWorkspace && !selected && requestedCampaign) {
       setSelected(requestedCampaign.id);
       setTab("review");
       setViewVersion(requestedCampaign.versions.length - 1);
@@ -263,6 +305,7 @@ export default function Workspace({
           "marketer",
       );
     setSelected(c.id);
+    setReviewerChoice(c.reviewerId || "");
     setTab("review");
     setViewVersion(c.versions.length - 1);
     setContent(
@@ -315,7 +358,12 @@ export default function Workspace({
               failure,
             ),
           };
-        const next = demoCommand(current, role, action, latest.id, data);
+        const next = demoCommand(current, role, action, latest.id, {
+          ...data,
+          actor: memberships.find(
+            (m) => m.user_id === activeUserId && m.workspace_id === workspaceId,
+          )?.display_name,
+        });
         setCampaigns((cs) => cs.map((c) => (c.id === next.id ? next : c)));
         if (action === "revise") {
           setViewVersion(next.versions.length - 1);
@@ -331,9 +379,11 @@ export default function Workspace({
               : "Mock precheck complete. Human review is still required."
             : action === "submit"
               ? "Version submitted. Content is now locked for human review."
-              : action === "comment"
-                ? "Comment added to this version."
-                : "Decision recorded against this exact version.",
+              : action === "assign"
+                ? "Reviewer assigned. The submitted content stays locked."
+                : action === "comment"
+                  ? "Comment added to this version."
+                  : "Decision recorded against this exact version.",
       );
       if (action === "revise")
         setDraftEdits((previous) => {
@@ -350,17 +400,43 @@ export default function Workspace({
       setBusy(false);
     }
   }
-  const scopedCampaigns = live
-    ? campaigns.filter((c) => c.workspaceId === workspaceId)
-    : campaigns;
+  const activeUserId = live
+    ? userId
+    : role === "marketer"
+      ? "demo-maya"
+      : previewReviewerId;
+  const teamMembers = memberships.filter((m) => m.workspace_id === workspaceId);
+  const reviewers = teamMembers.filter(
+    (m) => m.role === "reviewer" && m.user_id !== current?.ownerId,
+  );
+  const chosenReviewer =
+    reviewerChoice ||
+    current?.reviewerId ||
+    (reviewers.length === 1 ? reviewers[0].user_id : "");
+  const scopedCampaigns = campaigns.filter(
+    (c) => (c.workspaceId || "demo-team") === workspaceId,
+  );
+  const nextAction = (c: Campaign) =>
+    c.status === "In review"
+      ? `${c.reviewer || "Unassigned reviewer"}: review v${c.versions.at(-1)!.number}`
+      : c.status === "Approved"
+        ? `Approved v${c.versions.at(-1)!.number} · ready to use`
+        : c.status === "Changes requested"
+          ? `${c.owner}: revise the copy`
+          : c.status === "Rejected"
+            ? `${c.owner}: review the rationale`
+            : `${c.owner}: ${c.versions.at(-1)!.analyzed ? "choose reviewer & submit" : "prepare & precheck"}`;
   const queue = scopedCampaigns
     .filter(
       (c) =>
         (filter === "All work" ||
-          (filter === "My work" && (!live || c.ownerId === userId)) ||
+          (filter === "My work" && c.ownerId === activeUserId) ||
+          (filter === "Assigned to me" &&
+            c.reviewerId === activeUserId &&
+            c.status === "In review") ||
           c.status === filter) &&
         (productFilter === "All products" || c.product === productFilter) &&
-        `${c.title} ${c.owner} ${c.product}`
+        `${c.title} ${c.owner} ${c.reviewer || ""} ${c.product}`
           .toLowerCase()
           .includes(search.toLowerCase()),
     )
@@ -409,7 +485,8 @@ export default function Workspace({
             {live
               ? workspaces.find((w) => w.id === workspaceId)?.name ||
                 "Your workspace"
-              : "ClearPath Financial"}
+              : workspaces.find((w) => w.id === workspaceId)?.name ||
+                "Sample team"}
             <small>
               {live ? "Marketing & compliance" : "Sample workspace"}
             </small>
@@ -422,6 +499,7 @@ export default function Workspace({
               { id: "queue", label: "Review queue", Icon: Inbox },
               { id: "policies", label: "Policy library", Icon: BookOpen },
               { id: "analytics", label: "Analytics", Icon: BarChart3 },
+              { id: "team", label: "Team & people", Icon: Users },
             ] as const
           ).map(({ id, label, Icon }) => (
             <button
@@ -474,7 +552,11 @@ export default function Workspace({
                   ? identity.name || "Your account"
                   : role === "marketer"
                     ? "Maya Chen"
-                    : "Alex Morgan"}
+                    : memberships.find(
+                        (m) =>
+                          m.user_id === previewReviewerId &&
+                          m.workspace_id === workspaceId,
+                      )?.display_name || "Alex Morgan"}
               </strong>
               <small>
                 {live && !workspaceId
@@ -496,7 +578,9 @@ export default function Workspace({
                 ? "Policy library"
                 : tab === "analytics"
                   ? "Analytics"
-                  : "Review queue"}
+                  : tab === "team"
+                    ? "Team & people"
+                    : "Review queue"}
             </strong>
             {tab === "review" && (
               <>
@@ -544,7 +628,7 @@ export default function Workspace({
               ? `${workspaces.find((w) => w.id === workspaceId)?.name || "Workspace"} · ${role === "marketer" ? "Marketing" : "Compliance reviewer"}`
               : "Interactive demo · Fictional data · Changes stay in this tab"}
           </span>
-          {live && workspaces.length > 1 && (
+          {workspaces.length > 1 && (
             <label>
               Workspace{" "}
               <select
@@ -593,11 +677,37 @@ export default function Workspace({
               Explore as{" "}
               <select
                 aria-label="Demo role"
-                value={role}
-                onChange={(e) => setRole(e.target.value as Role)}
+                value={
+                  role === "marketer"
+                    ? "marketer"
+                    : previewReviewerId === "demo-alex"
+                      ? "reviewer"
+                      : previewReviewerId
+                }
+                onChange={(e) => {
+                  setRole(
+                    e.target.value === "marketer" ? "marketer" : "reviewer",
+                  );
+                  if (e.target.value !== "marketer")
+                    setPreviewReviewerId(
+                      e.target.value === "reviewer"
+                        ? "demo-alex"
+                        : e.target.value,
+                    );
+                  setFilter("All work");
+                }}
               >
                 <option value="marketer">Maya · Marketer</option>
-                <option value="reviewer">Alex · Reviewer</option>
+                {teamMembers
+                  .filter((m) => m.role === "reviewer")
+                  .map((m) => (
+                    <option
+                      key={m.user_id}
+                      value={m.user_id === "demo-alex" ? "reviewer" : m.user_id}
+                    >
+                      {m.display_name} · Reviewer
+                    </option>
+                  ))}
               </select>
             </label>
           )}
@@ -625,14 +735,14 @@ export default function Workspace({
               <Button onClick={refreshWorkspace}>Try loading again</Button>
             </section>
           ) : null}
-          {live && loadState === "ready" && !workspaceId ? (
+          {live && loadState === "ready" && !workspaceId && tab !== "team" ? (
             <section className="panel workspace-empty">
               <ShieldCheck size={30} />
               <h1>Your account is verified</h1>
               <p>
                 <strong>{identity.email}</strong> does not have workspace access
-                yet. Share your account ID with the workspace owner so they can
-                assign your Marketing or Compliance reviewer membership.
+                yet. Create a team or use an invitation code from a team owner
+                to join as Marketing or Compliance reviewer.
               </p>
               <code>{userId}</code>
               <div className="form-actions">
@@ -646,6 +756,9 @@ export default function Workspace({
                 >
                   Copy account ID
                 </Button>
+                <Button onClick={() => setTab("team")}>
+                  Create or join a team
+                </Button>
                 <Button onClick={refreshWorkspace}>Check access again</Button>
               </div>
               <a
@@ -657,7 +770,8 @@ export default function Workspace({
               </a>
             </section>
           ) : null}
-          {(!live || (loadState === "ready" && workspaceId)) && (
+          {(!live ||
+            (loadState === "ready" && (workspaceId || tab === "team"))) && (
             <>
               {error && (
                 <div className="alert error" role="alert">
@@ -680,6 +794,60 @@ export default function Workspace({
                     <X size={16} />
                   </button>
                 </div>
+              )}
+              {tab === "team" && (
+                <TeamPanel
+                  key={workspaceId}
+                  live={live}
+                  team={workspaces.find((w) => w.id === workspaceId)}
+                  members={teamMembers}
+                  userId={activeUserId}
+                  onChange={async (id) => {
+                    if (id) {
+                      history.replaceState(null, "", "/");
+                      setSelected(null);
+                    }
+                    await load(id);
+                  }}
+                  onDemoCreate={(name) => {
+                    const id = crypto.randomUUID();
+                    setWorkspaces((ws) => [
+                      ...ws,
+                      { id, name, owner_id: "demo-maya" },
+                    ]);
+                    setMemberships((ms) => [
+                      ...ms,
+                      {
+                        workspace_id: id,
+                        user_id: "demo-maya",
+                        role: "marketer",
+                        display_name: "Maya Chen",
+                      },
+                    ]);
+                    setWorkspaceId(id);
+                    setRole("marketer");
+                    setFilter("All work");
+                    setSelected(null);
+                  }}
+                  onDemoRename={(name) =>
+                    setWorkspaces((ws) =>
+                      ws.map((w) =>
+                        w.id === workspaceId ? { ...w, name } : w,
+                      ),
+                    )
+                  }
+                  onDemoMember={(name, memberRole) => {
+                    setMemberships((ms) => [
+                      ...ms,
+                      {
+                        workspace_id: workspaceId,
+                        user_id: crypto.randomUUID(),
+                        role: memberRole,
+                        display_name: name,
+                      },
+                    ]);
+                  }}
+                />
               )}
               {tab === "queue" && (
                 <>
@@ -716,6 +884,38 @@ export default function Workspace({
                       )}
                     </div>
                   </div>
+                  <div className="handoff-guide" aria-label="How reviews work">
+                    <div>
+                      <span>1</span>
+                      <strong>Marketing prepares</strong>
+                      <p>Create a draft and run precheck.</p>
+                    </div>
+                    <div>
+                      <span>2</span>
+                      <strong>Choose a reviewer</strong>
+                      <p>Submit a locked version to a named teammate.</p>
+                    </div>
+                    <div>
+                      <span>3</span>
+                      <strong>Compliance decides</strong>
+                      <p>Approve, request changes or reject with a reason.</p>
+                    </div>
+                    <Button variant="outline" onClick={() => setTab("team")}>
+                      <Users size={16} />
+                      Manage team
+                    </Button>
+                  </div>
+                  {teamMembers.length > 0 &&
+                    !teamMembers.some((m) => m.role === "reviewer") && (
+                      <div className="workflow-next">
+                        <strong>Bring in your reviewer.</strong> Add a
+                        compliance colleague in Team &amp; people before
+                        submitting your first campaign.{" "}
+                        <button onClick={() => setTab("team")}>
+                          Set up your team →
+                        </button>
+                      </div>
+                    )}
                   <div className="stats-row">
                     <div className="stat">
                       <span>
@@ -748,7 +948,9 @@ export default function Workspace({
                   <div className="panel queue-panel">
                     <div className="queue-tabs">
                       {[
-                        ...(live && role === "marketer" ? ["My work"] : []),
+                        ...(role === "marketer"
+                          ? ["My work"]
+                          : ["Assigned to me"]),
                         "All work",
                         "In review",
                         "Changes requested",
@@ -804,7 +1006,7 @@ export default function Workspace({
                             <th>Campaign</th>
                             <th>Status</th>
                             <th>Precheck risk</th>
-                            <th>Owner</th>
+                            <th>People &amp; next action</th>
                             <th>Review age</th>
                             <th />
                           </tr>
@@ -860,7 +1062,10 @@ export default function Workspace({
                                     </span>
                                   )}
                                 </td>
-                                <td className="owner-cell">
+                                <td
+                                  className="owner-cell"
+                                  data-label="People & next action"
+                                >
                                   <span className="owner">
                                     <span className="avatar tiny">
                                       {c.owner
@@ -871,8 +1076,15 @@ export default function Workspace({
                                         .join("")
                                         .toUpperCase()}
                                     </span>
-                                    {c.owner}
+                                    {c.owner} · Marketing
                                   </span>
+                                  <small className="reviewer-line">
+                                    Reviewer:{" "}
+                                    {c.reviewer || "Choose on submission"}
+                                  </small>
+                                  <small className="next-action">
+                                    {nextAction(c)}
+                                  </small>
                                 </td>
                                 <td className="muted">
                                   {c.submittedAt
@@ -994,6 +1206,8 @@ export default function Workspace({
                               ...data,
                               id,
                               owner: "Maya Chen",
+                              ownerId: "demo-maya",
+                              workspaceId,
                               status: "Draft",
                               updatedAt: at,
                               versions: [
@@ -1175,12 +1389,12 @@ export default function Workspace({
                     <ArrowLeft size={15} />
                     Review queue
                   </button>
-                  {live && (
+                  {
                     <p className="workflow-next" role="status">
                       {latestAnalysisFailed && !historical
                         ? "Marketing: the external analysis failed. Save a new version to retry; the previous attempt remains in history."
                         : current.status === "In review"
-                          ? "Awaiting a compliance reviewer’s decision on this submitted version."
+                          ? `${current.reviewer || "A compliance reviewer"} is responsible for reviewing v${latest.number}. ${current.owner} owns the marketing copy.`
                           : current.status === "Changes requested"
                             ? "Marketing: address the reviewer’s feedback in a new version, then rerun precheck."
                             : current.status === "Approved"
@@ -1189,7 +1403,7 @@ export default function Workspace({
                                 ? "Marketing: review the decision rationale before creating a new draft."
                                 : "Marketing: prepare the copy, run precheck, and submit this version for review."}
                     </p>
-                  )}
+                  }
                   <div className="review-heading">
                     <div>
                       <div className="review-kicker">
@@ -1198,7 +1412,11 @@ export default function Workspace({
                       <h1>{current.title}</h1>
                       <div className="review-meta">
                         <Badge value={current.status} />
-                        <span>{current.owner}</span>
+                        <span>Marketing: {current.owner}</span>
+                        <span>
+                          {historical ? "Current reviewer" : "Reviewer"}:{" "}
+                          {current.reviewer || "Not assigned yet"}
+                        </span>
                         <span>
                           {busy
                             ? "Saving…"
@@ -1233,15 +1451,25 @@ export default function Workspace({
                         ) : (
                           <Button
                             disabled={
-                              busy || current.status === "Changes requested"
+                              busy ||
+                              current.status === "Changes requested" ||
+                              !chosenReviewer
                             }
-                            onClick={() => act("submit")}
+                            onClick={() =>
+                              act("submit", {
+                                reviewerId: chosenReviewer,
+                                reviewer: reviewers.find(
+                                  (m) => m.user_id === chosenReviewer,
+                                )?.display_name,
+                              })
+                            }
                           >
                             Submit v{latest.number} for review
                             <ArrowRight size={16} />
                           </Button>
                         ))}
                       {role === "reviewer" &&
+                        current.reviewerId === activeUserId &&
                         current.status === "In review" &&
                         !historical && (
                           <Button
@@ -1256,6 +1484,62 @@ export default function Workspace({
                         )}
                     </div>
                   </div>
+                  {!historical &&
+                    ((editable && current.status === "Draft") ||
+                      (current.status === "In review" &&
+                        (current.ownerId === activeUserId ||
+                          workspaces.find((w) => w.id === workspaceId)
+                            ?.owner_id === activeUserId))) && (
+                      <div className="reviewer-picker">
+                        <label>
+                          Compliance reviewer
+                          <select
+                            aria-label="Compliance reviewer"
+                            value={chosenReviewer}
+                            onChange={(e) => setReviewerChoice(e.target.value)}
+                          >
+                            <option value="">Choose a teammate</option>
+                            {reviewers.map((m) => (
+                              <option key={m.user_id} value={m.user_id}>
+                                {m.display_name || "Team reviewer"}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <p>
+                          {reviewers.length
+                            ? "This person will review the submitted version. Precheck does not approve the campaign."
+                            : "No eligible reviewer yet. Invite a compliance colleague in Team & people."}
+                        </p>
+                        {current.status === "In review" && (
+                          <Button
+                            disabled={
+                              busy ||
+                              !chosenReviewer ||
+                              chosenReviewer === current.reviewerId
+                            }
+                            onClick={() =>
+                              act("assign", {
+                                reviewerId: chosenReviewer,
+                                reviewer: reviewers.find(
+                                  (m) => m.user_id === chosenReviewer,
+                                )?.display_name,
+                              })
+                            }
+                          >
+                            Assign reviewer
+                          </Button>
+                        )}
+                        {!reviewers.length && (
+                          <Button
+                            variant="outline"
+                            onClick={() => setTab("team")}
+                          >
+                            Add a reviewer
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   <div className="version-bar">
                     <span>
                       <GitBranch size={16} />
@@ -1350,8 +1634,12 @@ export default function Workspace({
                         <ShieldCheck size={16} />
                         <span>
                           Ready for a human decision. Switch{" "}
-                          <strong>Explore as → Alex · Reviewer</strong> above to
-                          continue the demo.
+                          <strong>
+                            Explore as →{" "}
+                            {current.reviewer || "your assigned reviewer"} ·
+                            Reviewer
+                          </strong>{" "}
+                          above to continue the demo.
                         </span>
                       </div>
                     )}
@@ -1944,7 +2232,7 @@ export default function Workspace({
               Recorded as{" "}
               {live
                 ? "your authenticated reviewer identity"
-                : "Alex Morgan (isolated demo)"}
+                : `${memberships.find((m) => m.user_id === previewReviewerId && m.workspace_id === workspaceId)?.display_name || "Sample reviewer"} (isolated demo)`}
               . This decision applies only to version {latest.number}.
             </p>
             <div className="form-actions">

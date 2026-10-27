@@ -58,12 +58,16 @@ test("complete isolated evaluator workflow and preserved approval history", asyn
   ).toBeDisabled();
   await page.getByLabel("Decision", { exact: true }).selectOption("approve");
   await page.getByRole("button", { name: "Confirm decision · v2" }).click();
-  await expect(page.getByRole("status")).toContainText("Decision recorded");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Decision recorded" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Activity", exact: true }).click();
   await expect(page.getByText("approved this version")).toBeVisible();
   await page.getByLabel("Demo role").selectOption("marketer");
   await page.getByRole("button", { name: "Save as v3" }).click();
-  await expect(page.getByRole("status")).toContainText("New immutable version");
+  await expect(
+    page.getByRole("status").filter({ hasText: "New immutable version" }),
+  ).toBeVisible();
   await page.getByLabel("Content version").selectOption("1");
   await expect(page.getByText("approved this version")).toBeVisible();
   expect(browserErrors).toEqual([]);

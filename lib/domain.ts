@@ -63,6 +63,8 @@ export type Campaign = {
   status: Status;
   owner: string;
   ownerId?: string;
+  reviewerId?: string;
+  reviewer?: string;
   versions: Version[];
   events: Event[];
   updatedAt: string;
@@ -286,6 +288,7 @@ export type Membership = {
   workspace_id: string;
   role: Role;
   display_name?: string;
+  is_admin?: boolean;
 };
 export function roleForWorkspace(
   members: Membership[],
@@ -353,3 +356,10 @@ export function safeAssessment(
     };
   }
 }
+
+export type Team = {
+  id: string;
+  name: string;
+  owner_id?: string | null;
+  analysisMode?: "mock" | "openai";
+};

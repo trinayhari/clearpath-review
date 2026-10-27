@@ -316,3 +316,50 @@ test("persisted external failure offers a new immutable version without retrying
     page.getByRole("button", { name: "Run precheck", exact: true }),
   ).toHaveCount(0);
 });
+
+test("stored OpenAI provenance remains visible when new live analysis is disabled", async ({
+  page,
+}) => {
+  const { seedCampaigns } = await import("../../lib/fixtures");
+  const original = (await seedCampaigns())[0];
+  const version = {
+    ...original.versions[0],
+    analyzed: true,
+    assessmentProvider: "openai",
+    analysisModel: "gpt-5.4-mini-2026-03-17",
+  };
+  const campaign = {
+    ...original,
+    ownerId: "qa-owner",
+    workspaceId: "qa-workspace",
+    versions: [version],
+  };
+  await page.route("**/api/workspace", (route) =>
+    route.fulfill({
+      json: {
+        userId: "qa-owner",
+        email: "fictional@example.invalid",
+        members: [
+          {
+            user_id: "qa-owner",
+            workspace_id: "qa-workspace",
+            role: "marketer",
+          },
+        ],
+        workspaces: [
+          { id: "qa-workspace", name: "QA workspace", analysisMode: "mock" },
+        ],
+        campaigns: [campaign],
+      },
+    }),
+  );
+  await page.goto(`/preview?workspace=live&campaign=${campaign.id}`);
+  await expect(
+    page.getByText("OpenAI analysis · gpt-5.4-mini-2026-03-17", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Mock precheck · deterministic rules", { exact: true }),
+  ).toHaveCount(0);
+});

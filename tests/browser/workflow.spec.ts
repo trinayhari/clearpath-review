@@ -84,9 +84,7 @@ test("queue filters, policy library, analytics, mobile layout and auth denial", 
   await page
     .getByRole("button", { name: "Policy library", exact: true })
     .click();
-  await expect(
-    page.getByText("Review guidelines"),
-  ).toBeVisible();
+  await expect(page.getByText("Review guidelines")).toBeVisible();
   await page.getByRole("button", { name: "Analytics", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Review insights" }),
@@ -253,11 +251,8 @@ test("review dialogs trap keyboard focus, restore their trigger, and policy cita
     .getByRole("button", { name: "Review queue", exact: false })
     .first()
     .click();
-  expect(
-    await page
-      .locator(".queue-tabs")
-      .evaluate((el) => getComputedStyle(el).overflowY),
-  ).toBe("hidden");
+  await expect(page.getByLabel("Filter status")).toBeVisible();
+  await expect(page.getByLabel("Search campaigns")).toBeVisible();
 });
 
 test("persisted external failure offers a new immutable version without retrying the same analysis", async ({
@@ -304,7 +299,7 @@ test("persisted external failure offers a new immutable version without retrying
   );
   await page.goto(`/preview?workspace=live&campaign=${campaign.id}`);
   await expect(
-    page.getByText(/the external analysis failed. Save a new version to retry/),
+    page.getByText(/Precheck failed. Save a new version to try again/),
   ).toBeVisible();
   await expect(
     page.getByRole("button", {
@@ -362,4 +357,34 @@ test("stored OpenAI provenance remains visible when new live analysis is disable
   await expect(
     page.getByText("Rules-based precheck", { exact: true }),
   ).toHaveCount(0);
+});
+
+test("queue combines ownership, status and product filters without losing context", async ({
+  page,
+}) => {
+  await page.goto("/preview");
+  await expect(
+    page.getByRole("columnheader", { name: "Author", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("columnheader", { name: "Reviewer", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "My work", exact: true }).click();
+  await page.getByLabel("Filter status").selectOption("Approved");
+  await page.getByLabel("Filter product").selectOption("Personal loans");
+  await expect(page.locator("tbody tr")).toHaveCount(1);
+  await expect(
+    page.getByRole("button", { name: /A clearer way to consolidate/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "My work", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.getByLabel("Search campaigns").fill("missing campaign");
+  await expect(
+    page.getByRole("heading", { name: "No campaigns match" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Reset filters" }).click();
+  await expect(page.getByLabel("Filter status")).toHaveValue("All statuses");
+  await expect(page.getByLabel("Filter product")).toHaveValue("All products");
+  await expect(page.locator("tbody tr")).toHaveCount(8);
 });

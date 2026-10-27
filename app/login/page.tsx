@@ -21,21 +21,41 @@ export default function Login() {
       <section className="auth-intro">
         <Brand />
         <div>
-          <span className="eyebrow">MARKETING & COMPLIANCE, IN SYNC</span>
+          <span className="eyebrow">CLEARPATH REVIEW</span>
           <h1>
-            Clear decisions.
+            From campaign draft
             <br />
-            One shared record.
+            to a clear decision.
           </h1>
           <p>
-            Bring the campaign, the policy, and the conversation together. Move
-            from first draft to a decision on the exact copy.
+            A shared workspace for marketing and compliance. Know what needs
+            review, who owns it, and what happens next.
           </p>
-          <div className="auth-principles">
-            <span>Version history that stays intact</span>
-            <span>Review decisions owned by people</span>
-            <span>Saved work, ready for your team</span>
-          </div>
+          <ol className="auth-workflow">
+            <li>
+              <span>01</span>
+              <div>
+                <strong>Prepare the campaign</strong>
+                <small>Marketing saves the copy and runs a precheck.</small>
+              </div>
+            </li>
+            <li>
+              <span>02</span>
+              <div>
+                <strong>Work through feedback</strong>
+                <small>A named reviewer checks the submitted version.</small>
+              </div>
+            </li>
+            <li>
+              <span>03</span>
+              <div>
+                <strong>Keep the decision on record</strong>
+                <small>
+                  Approval, revisions, and discussion stay together.
+                </small>
+              </div>
+            </li>
+          </ol>
         </div>
         <small>ClearPath Financial · Marketing review workspace</small>
       </section>

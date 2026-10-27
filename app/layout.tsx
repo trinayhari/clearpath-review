@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthReturnRouter } from "@/components/auth/return-router";
 export const metadata: Metadata = {
   title: "ClearPath Review",
   description:
@@ -12,7 +13,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <AuthReturnRouter />
+        {children}
+      </body>
     </html>
   );
 }

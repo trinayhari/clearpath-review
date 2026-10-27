@@ -4,16 +4,17 @@ The primary application at `/` requires an individual Supabase Auth identity and
 
 ## Administrator provisioning (approval required)
 
-Before changing persistent access, obtain the owner's approval for each actual recipient email, role, and target workspace. Use two different people/accounts for Marketing and Compliance reviewer. Never invent recipients, share passwords, expose a service-role key, or use user-editable metadata for roles.
+Before changing persistent access, obtain the owner's approval for each actual recipient email, role, and target workspace. Use distinct accounts for Marketing and Compliance reviewer. The owner-approved aliases are two test identities controlled by one person, not proof of independent human review. Never invent recipients, share passwords, expose a service-role key, or use user-editable metadata for roles.
 
 For the existing instance, use only Supabase project `tztlatsflqjlfadipguu` and the approved workspace. Configure Auth URL settings:
 
 - Site URL: `https://clearpath-review-livid.vercel.app`
 - Allowed redirect: `https://clearpath-review-livid.vercel.app/auth/confirm`
-- Invite email link: `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=invite`
-- Magic Link email link: `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email`
+- Keep default `{{ .ConfirmationURL }}` Invite and Magic Link templates; custom templates are not required.
 
-These are specific project configuration changes; review/approve them with the invitations. The callback supports one-time token hashes and PKCE codes. It deliberately rejects reusable session tokens in URL fragments. Do not enable a public signup-to-membership trigger. Built-in Supabase email delivery may restrict recipients; if delivery requires custom SMTP, stop for an approved sender configuration rather than creating credentials or purchasing a plan.
+Site URL and redirect allowlist are specific project configuration changes requiring approval. The app supports default Supabase invitations (implicit callback) and PKCE magic links. Invitation fragments are immediately scrubbed, their identity verified against Supabase, and the user must confirm the verified account before a stateless refresh verifies token ownership and the server installs session cookies. Default dashboard invitations returning to Site URL are routed to this callback, even when an existing account is signed in. No tokens are printed, stored in localStorage, or included in request URLs. One-time token-hash callbacks remain supported if customized later. No public signup-to-membership trigger exists.
+
+**Delivery blocker:** current official Supabase documentation says its built-in sender only sends to exact organization-team email addresses. A deliverable Gmail plus alias is not automatically pre-authorized. If the two approved aliases are not already permitted recipients, custom SMTP or an approved Send Email hook is required. Do not grant organization membership merely to bypass email limits, disable verification, buy Pro, create SMTP credentials or configure a sender without separate approval. Parent coordinates the supported admin invitation/configuration steps; do not send duplicates.
 
 Send invitations using **Supabase Dashboard → Authentication → Users → Invite user**, or the supported Auth Admin `inviteUserByEmail` API from an approved secure administrative environment. The application needs no service key. Do not create Auth users by inserting SQL rows. Invite links are credentials: deliver them only through the recipient's private inbox, never chat, source, logs or screenshots.
 

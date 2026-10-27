@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverClient } from "@/lib/supabase";
 import { z } from "zod";
+import { createClient } from "@supabase/supabase-js";
+import {
+  inspectInvitation,
+  acceptInvitation,
+} from "@/lib/server/invite-session";
 import {
   verifiedRequestOrigin,
   readJsonBody,
@@ -22,6 +27,16 @@ const inputSchema = z.discriminatedUnion("action", [
     tokenHash: z.string().min(1).max(4096),
     type: z.enum(["email", "invite", "recovery"]),
   }),
+  z.object({
+    action: z.literal("preview_invite"),
+    accessToken: z.string().min(20).max(6000),
+  }),
+  z.object({
+    action: z.literal("accept_invite"),
+    accessToken: z.string().min(20).max(6000),
+    refreshToken: z.string().min(10).max(1000),
+    expectedUserId: z.uuid(),
+  }),
   z.object({ action: z.literal("logout") }),
 ]);
 export async function POST(req: NextRequest) {
@@ -33,6 +48,37 @@ export async function POST(req: NextRequest) {
       );
     const input = inputSchema.parse(await readJsonBody(req, 8192)),
       db = await serverClient();
+    if (input.action === "preview_invite" || input.action === "accept_invite") {
+      const verifier = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+          },
+        },
+      );
+      try {
+        const identity =
+          input.action === "preview_invite"
+            ? await inspectInvitation(verifier.auth, input.accessToken)
+            : await acceptInvitation(verifier.auth, db.auth, input);
+        return NextResponse.json(
+          { ok: true, ...identity },
+          { headers: { "Cache-Control": "no-store" } },
+        );
+      } catch {
+        return NextResponse.json(
+          {
+            error:
+              "This invitation is invalid or expired. Request a new invitation.",
+          },
+          { status: 400 },
+        );
+      }
+    }
     if (input.action === "email_link") {
       // Never creates a public signup or grants membership. Generic reply avoids email enumeration.
       const { error } = await db.auth.signInWithOtp({

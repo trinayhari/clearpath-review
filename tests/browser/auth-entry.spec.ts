@@ -103,3 +103,44 @@ test("auth rejects oversized and malformed bodies before contacting identity pro
     expect(result.body.error).toBeTruthy();
   }
 });
+test("default invite fragments are scrubbed and require explicit verified-account confirmation", async ({
+  page,
+}) => {
+  const actions: string[] = [];
+  await page.route("**/api/auth", (route) => {
+    const action = route.request().postDataJSON().action;
+    actions.push(action);
+    return route.fulfill({
+      json:
+        action === "preview_invite"
+          ? {
+              ok: true,
+              userId: "00000000-0000-4000-8000-000000000001",
+              email: "fictional@example.invalid",
+            }
+          : { error: "Synthetic expired invitation" },
+      status: action === "preview_invite" ? 200 : 400,
+    });
+  });
+  await page.goto(
+    "/#type=invite&access_token=synthetic-invitation-access-token&refresh_token=synthetic-invitation-refresh-token",
+  );
+  await expect(page).toHaveURL(/\/auth\/confirm$/);
+  await expect(
+    page.getByRole("heading", { name: "Confirm your account" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("fictional@example.invalid", { exact: true }),
+  ).toBeVisible();
+  expect(actions).toEqual(["preview_invite"]);
+  expect(await page.locator("body").textContent()).not.toContain(
+    "synthetic-invitation-access-token",
+  );
+  await page
+    .getByRole("button", { name: "Continue with this account" })
+    .click();
+  await expect(page.locator("p[role=alert]")).toHaveText(
+    "Synthetic expired invitation",
+  );
+  expect(actions).toEqual(["preview_invite", "accept_invite"]);
+});

@@ -110,3 +110,12 @@ Source publication encountered new remote commit `951222b` (teams/reviewer hando
 Combined browser verification: 14 scenarios passed together; the remaining workflow scenario passed on targeted rerun after narrowing both ambiguous status assertions. All 15 scenarios therefore have passing evidence on this combined runtime; no real provider transport was used.
 
 Follow-up full-suite rerun: all 15 browser scenarios passed together (21.8 seconds) on the merged source. Hosted ledger readback independently reconfirmed exactly two failed runs, each retaining 200000 microUSD, with null input/output token counts. The second safe diagnostic establishes a parsed structured response followed by evidence/policy verification failure; raw model reply was not retained. No additional provider request occurred. Credential process 71870 remained alive; paired rollout is awaiting independent review.
+
+
+## Disabled anchored rollout and actual assigned-reviewer verification
+
+Reviewed anchored contract applied as hosted migration `20261027050122`. Runtime commit `746c18c` deployed READY as `dpl_GCmTivZ43Z91fA5LnasyEQddBUyq` on the production alias with live analysis disabled. All 15 production browser scenarios passed together (22.2 seconds).
+
+The existing approved QA accounts exercised the merged teams workflow without creating users or granting access. On campaign `8d444dc3-e1dd-4d94-9479-90d65f4444bd`, mock precheck and explicit reviewer assignment persisted for v3 `497bc62c-04f3-4360-9b6b-16b65488d434`. Assigning the marketer as reviewer returned 400; owner approval returned 403; stale-version approval returned 409. Assigned reviewer `e3eedda6-5489-4cbc-aedf-b5f309352a3f` approved v3. Marketer then created unapproved Draft v4 `02c1abff-c8de-429c-9198-afa8e0923507`; both actual sessions refreshed and confirmed the historical v3 approval did not apply to v4. A harness-only campaign-title mismatch was corrected before the successful run; credentials remained in process memory. No paid analysis was requested during this rollout.
+
+Evidence anchoring proves that cited text exists at exact source offsets. It does not establish semantic relevance, completeness of findings, or correctness of proposed edits; human review remains required.

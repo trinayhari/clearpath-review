@@ -1,5 +1,6 @@
 import "server-only";
 // Server-only adapter. Runtime callers require a signed database claim; public preview never imports this.
+import { ProviderFailure, providerHttpFailure } from "./provider-diagnostics";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
@@ -82,16 +83,9 @@ export function createOpenAIProvider(config: {
           },
         );
       } catch {
-        throw new Error(
-          "Analysis timed out or could not connect. Your draft is unchanged.",
-        );
+        throw new ProviderFailure("network");
       }
-      if (!response.ok)
-        throw new Error(
-          response.status === 429
-            ? "Analysis is temporarily rate limited. Try again later."
-            : "Analysis provider unavailable. Your draft is unchanged.",
-        );
+      if (!response.ok) throw await providerHttpFailure(response);
       // Bound even a malformed upstream response; no raw provider bodies enter errors/logs.
       const reader = response.body?.getReader();
       if (!reader) throw new Error("Empty analysis response.");

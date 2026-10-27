@@ -647,7 +647,7 @@ export async function testTrustedRuntime(
             },
           },
         );
-      await assert.rejects(run(), /No clean assessment/);
+      await assert.rejects(run(), /No assessment was saved/);
       await assert.rejects(run(), /already attempted/);
       assert.equal(calls, 1);
       await db.query("reset role");

@@ -1,4 +1,5 @@
 import "server-only";
+import { safeProviderFailure } from "./provider-diagnostics";
 import { createHmac, createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -165,7 +166,17 @@ export async function runTrustedAnalysis(
       reservation.product,
     );
     if (!metadata) throw new Error("Analysis usage could not be verified.");
-  } catch {
+  } catch (error) {
+    const failure = safeProviderFailure(error);
+    console.warn(
+      JSON.stringify({
+        event: "clearpath_analysis_failure",
+        executionId: reservation.id,
+        code: failure.diagnosticCode,
+        upstreamStatus: failure.upstreamStatus,
+        requestId: failure.requestId,
+      }),
+    );
     // Never refund uncertain provider spend or retry automatically. Best-effort signed
     // failure records no assessment; even if it cannot finalize, reservation remains.
     try {
@@ -179,9 +190,7 @@ export async function runTrustedAnalysis(
         ),
       );
     } catch {}
-    throw new Error(
-      "External analysis could not complete. No clean assessment was recorded. Create a revised version before retrying.",
-    );
+    throw failure;
   }
   await call(
     "cp_finalize_analysis",

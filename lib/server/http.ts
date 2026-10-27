@@ -1,3 +1,4 @@
+import { ProviderFailure } from "./provider-diagnostics";
 export class RequestInputError extends Error {
   constructor(
     message: string,
@@ -148,6 +149,11 @@ export function workflowFailure(error: unknown): {
   status: number;
   message: string;
 } {
+  if (error instanceof ProviderFailure)
+    return {
+      status: error.diagnosticCode === "rate_limited" ? 429 : 503,
+      message: error.message,
+    };
   if (
     error &&
     typeof error === "object" &&

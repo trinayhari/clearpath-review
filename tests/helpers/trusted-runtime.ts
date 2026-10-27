@@ -557,7 +557,7 @@ export async function testTrustedRuntime(
                                 policyId: "CP-101",
                                 severity: "High",
                                 title: "Approval claim needs evidence",
-                                evidence: "guaranteed approval",
+                                evidenceId: "excerpt_1",
                                 rationale: "Unsupported guarantee.",
                                 replacement: null,
                                 uncertainty:

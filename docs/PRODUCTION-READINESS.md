@@ -4,7 +4,7 @@ This is a tested vertical slice for fictional financial marketing reviews, not a
 
 | Area | Status | Evidence / remaining work |
 |---|---|---|
-| Production build and types | Passed | Next.js production build, TypeScript check, 70 local automated domain/database/provider/HTTP tests |
+| Production build and types | Passed | Next.js production build, TypeScript check, 73 local automated domain/database/provider/HTTP tests |
 | Authentication entry | Passed, limited | Root gates on validated `getUser`; signed-out production browser redirects to login; no fixture fallback |
 | Actual signup/login and session refresh | Passed for approved QA identities | Real password signup, refresh, logout and password relogin passed for two isolated QA users; earlier invitation delivery also verified, email-link quota remains a limitation |
 | Workspace isolation and roles | Passed locally and in actual QA requests | Real PostgreSQL RLS/grants; cross-workspace and same-workspace non-owner mutations rejected; no metadata-based roles |
@@ -14,10 +14,10 @@ This is a tested vertical slice for fictional financial marketing reviews, not a
 | Immutable audit and analysis | Passed locally | Direct app writes revoked; immutable triggers; caller-supplied mock findings rejected |
 | Safe operational errors | Passed | Fixed message catalogue; raw database errors not returned; stale/concurrent actions classified; uncertain results require refresh |
 | Input/output bounds | Passed | Streamed request-body limit, content/note schemas, response size/finding limits and full output validation |
-| Browser workflow/accessibility | Passed, bounded | Eleven deployed regression scenarios at 09c25fa plus actual authenticated QA loop; independent desktop/mobile review; focus trapping and policy return; not full WCAG certification |
+| Browser workflow/accessibility | Passed, bounded | Twelve local regression scenarios after anchored-output/recovery fix; eleven deployed scenarios at 09c25fa plus actual authenticated QA loop; independent desktop/mobile review; focus trapping and policy return; not full WCAG certification |
 | Mock assessment trust | Passed | Database computes from stored version; provenance required; no AI approval |
 | External provider parsing/failure handling | Passed with synthetic transport | Schema, excerpts, applicability, refusal, incomplete response, timeout and rate-limit paths |
-| Actual paid provider validation | Failed first attempt; diagnosis bounded | One real request failed safely; no assessment/usage stored, $0.20 retained reservation. Read-only model access succeeds. Original error category was discarded; sanitized diagnostics now deployed. No second analysis yet |
+| Actual paid provider validation | Failed two attempts; correction locally verified | Two real requests failed safely; no assessment/usage stored, $0.40 retained reservations and actual spend unknown. Second failure: invalid_evidence (policy ID or quote verification). Anchored IDs fix passes synthetic tests, not yet real inference. No further paid request authorized under the two-call plan |
 | Provider persistence and provenance | Hosted; success path unverified with real model | Reservation/start/signed failure persisted in production; ordinary user RPC cannot forge external findings. Actual successful provider finalization still pending |
 | Cost controls | Active for bounded QA validation | Database-owned cumulative $2 global ceiling, $0.20 permanent reservation/attempt, durable quotas and no refunds/retries. Exact QA workspace also gated in server/UI; arbitrary signups remain mock |
 | Auth rate limiting | Platform-managed; operational verification pending | Uses Supabase Auth limits; 429 handled. Do not claim a tested distributed custom rate limiter |

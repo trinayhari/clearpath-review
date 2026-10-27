@@ -255,3 +255,60 @@ test("review dialogs trap keyboard focus, restore their trigger, and policy cita
       .evaluate((el) => getComputedStyle(el).overflowY),
   ).toBe("hidden");
 });
+
+test("persisted external failure offers a new immutable version without retrying the same analysis", async ({
+  page,
+}) => {
+  const { seedCampaigns } = await import("../../lib/fixtures");
+  const original = (await seedCampaigns())[0];
+  const version = { ...original.versions[0], analyzed: false, findings: [] };
+  const campaign = {
+    ...original,
+    status: "Draft",
+    ownerId: "qa-owner",
+    workspaceId: "qa-workspace",
+    versions: [version],
+    events: [
+      {
+        id: "failed-event",
+        action: "analysis_failed",
+        actor: "QA owner",
+        versionId: version.id,
+        at: "2026-10-27T00:00:00Z",
+        note: "External analysis failed; no assessment was stored.",
+      },
+    ],
+  };
+  await page.route("**/api/workspace", (route) =>
+    route.fulfill({
+      json: {
+        userId: "qa-owner",
+        email: "fictional@example.invalid",
+        members: [
+          {
+            user_id: "qa-owner",
+            workspace_id: "qa-workspace",
+            role: "marketer",
+          },
+        ],
+        workspaces: [
+          { id: "qa-workspace", name: "QA workspace", analysisMode: "openai" },
+        ],
+        campaigns: [campaign],
+      },
+    }),
+  );
+  await page.goto(`/preview?workspace=live&campaign=${campaign.id}`);
+  await expect(
+    page.getByText(/the external analysis failed. Save a new version to retry/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", {
+      name: `Save as v${version.number + 1}`,
+      exact: true,
+    }),
+  ).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Run precheck", exact: true }),
+  ).toHaveCount(0);
+});

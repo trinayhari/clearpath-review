@@ -324,7 +324,10 @@ export function safeAssessment(
           execution_id: z.uuid(),
           provenance: z.object({
             model: z.literal("gpt-5.4-mini-2026-03-17"),
-            policyBundle: z.literal("clearpath-review-2026-10-27-v1"),
+            policyBundle: z.enum([
+              "clearpath-review-2026-10-27-v1",
+              "clearpath-review-2026-10-27-v2-anchored",
+            ]),
             contentHash: z.string().regex(/^[a-f0-9]{64}$/),
             responseId: z.string().min(1).max(200),
             inputTokens: z.number().int().min(0).max(102048),

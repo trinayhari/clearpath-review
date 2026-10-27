@@ -123,6 +123,13 @@ export default function Workspace({
   const latest = current?.versions.at(-1);
   const version = current?.versions[viewVersion] ?? latest;
   const historical = Boolean(version && latest && version.id !== latest.id);
+  const latestAnalysisFailed = Boolean(
+    live &&
+    latest &&
+    current?.events.some(
+      (e) => e.action === "analysis_failed" && e.versionId === latest.id,
+    ),
+  );
   const editable = Boolean(
     current &&
     role === "marketer" &&
@@ -1170,15 +1177,17 @@ export default function Workspace({
                   </button>
                   {live && (
                     <p className="workflow-next" role="status">
-                      {current.status === "In review"
-                        ? "Awaiting a compliance reviewer’s decision on this submitted version."
-                        : current.status === "Changes requested"
-                          ? "Marketing: address the reviewer’s feedback in a new version, then rerun precheck."
-                          : current.status === "Approved"
-                            ? "This exact version is approved. Any further edits create a new draft requiring review."
-                            : current.status === "Rejected"
-                              ? "Marketing: review the decision rationale before creating a new draft."
-                              : "Marketing: prepare the copy, run precheck, and submit this version for review."}
+                      {latestAnalysisFailed && !historical
+                        ? "Marketing: the external analysis failed. Save a new version to retry; the previous attempt remains in history."
+                        : current.status === "In review"
+                          ? "Awaiting a compliance reviewer’s decision on this submitted version."
+                          : current.status === "Changes requested"
+                            ? "Marketing: address the reviewer’s feedback in a new version, then rerun precheck."
+                            : current.status === "Approved"
+                              ? "This exact version is approved. Any further edits create a new draft requiring review."
+                              : current.status === "Rejected"
+                                ? "Marketing: review the decision rationale before creating a new draft."
+                                : "Marketing: prepare the copy, run precheck, and submit this version for review."}
                     </p>
                   )}
                   <div className="review-heading">
@@ -1203,6 +1212,7 @@ export default function Workspace({
                       {editable &&
                         !historical &&
                         (content !== latest.content ||
+                        latestAnalysisFailed ||
                         latest.assessmentWarning ||
                         ["Approved", "Rejected"].includes(current.status) ? (
                           <Button

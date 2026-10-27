@@ -102,3 +102,63 @@ test("refusal, incomplete response, rate limit and timeout never become clean re
     );
   }
 });
+
+test("safe provider failure identifies refusal, output limit, schema and evidence stages", async () => {
+  const cases = [
+    [
+      new Response(
+        JSON.stringify({
+          status: "incomplete",
+          incomplete_details: { reason: "max_output_tokens" },
+          output: [],
+        }),
+      ),
+      "output_token_limit",
+    ],
+    [
+      new Response(
+        JSON.stringify({
+          status: "completed",
+          output: [
+            {
+              type: "message",
+              content: [
+                { type: "refusal", refusal: "do not log private content" },
+              ],
+            },
+          ],
+        }),
+      ),
+      "refusal",
+    ],
+    [
+      reply({ findings: [{ ...finding, title: 123 }] }),
+      "invalid_output_schema",
+    ],
+    [
+      reply({ findings: [{ ...finding, evidence: "fabricated excerpt" }] }),
+      "invalid_evidence",
+    ],
+  ] as const;
+  for (const [response, code] of cases) {
+    await assert.rejects(
+      createOpenAIProvider({
+        enabled: true,
+        apiKey: "synthetic",
+        model: "synthetic",
+        transport: async () => response,
+      }).analyze(text, "Personal loans"),
+      (error: unknown) => {
+        assert.equal(
+          (error as { diagnosticCode: string }).diagnosticCode,
+          code,
+        );
+        assert.doesNotMatch(
+          String(error),
+          /do not log private content|fabricated excerpt/,
+        );
+        return true;
+      },
+    );
+  }
+});

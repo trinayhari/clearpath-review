@@ -88,7 +88,7 @@ export function createOpenAIProvider(config: {
       if (!response.ok) throw await providerHttpFailure(response);
       // Bound even a malformed upstream response; no raw provider bodies enter errors/logs.
       const reader = response.body?.getReader();
-      if (!reader) throw new Error("Empty analysis response.");
+      if (!reader) throw new ProviderFailure("invalid_json");
       const chunks: Uint8Array[] = [];
       let size = 0;
       while (true) {
@@ -97,7 +97,7 @@ export function createOpenAIProvider(config: {
         size += value.length;
         if (size > 100000) {
           await reader.cancel();
-          throw new Error("Analysis response exceeded its limit.");
+          throw new ProviderFailure("response_limit");
         }
         chunks.push(value);
       }
@@ -111,6 +111,7 @@ export function createOpenAIProvider(config: {
         id?: string;
         usage?: { input_tokens?: number; output_tokens?: number };
         status?: string;
+        incomplete_details?: { reason?: string };
         output?: {
           type?: string;
           content?: { type?: string; text?: string }[];
@@ -119,34 +120,36 @@ export function createOpenAIProvider(config: {
       try {
         envelope = JSON.parse(new TextDecoder().decode(bytes));
       } catch {
-        throw new Error("Analysis returned invalid structured output.");
+        throw new ProviderFailure("invalid_json");
       }
       if (envelope.status !== "completed" || !Array.isArray(envelope.output))
-        throw new Error("Analysis was incomplete. Your draft is unchanged.");
+        throw new ProviderFailure(
+          envelope.incomplete_details?.reason === "max_output_tokens"
+            ? "output_token_limit"
+            : "incomplete_output",
+        );
       const parts = envelope.output.flatMap((item) =>
         item.type === "message" && Array.isArray(item.content)
           ? item.content
           : [],
       );
       if (parts.some((p) => p.type === "refusal"))
-        throw new Error(
-          "The provider could not assess this copy. A human review is needed.",
-        );
+        throw new ProviderFailure("refusal");
       const texts = parts.filter((p) => p.type === "output_text");
       if (texts.length !== 1 || typeof texts[0].text !== "string")
-        throw new Error("Analysis returned invalid structured output.");
+        throw new ProviderFailure("invalid_output_schema");
       let parsed: z.infer<typeof outputSchema>;
       try {
         parsed = outputSchema.parse(JSON.parse(texts[0].text));
       } catch {
-        throw new Error("Analysis returned invalid structured output.");
+        throw new ProviderFailure("invalid_output_schema");
       }
       const findings = validateFindings(
         parsed.findings.map((f) => {
           const policy = rules.find((p) => p.id === f.policyId),
             index = content.indexOf(f.evidence);
           if (!policy || index < 0)
-            throw new Error("Analysis failed evidence verification.");
+            throw new ProviderFailure("invalid_evidence");
           return {
             ...f,
             id: randomUUID(),
@@ -174,8 +177,7 @@ export function createOpenAIProvider(config: {
             inputTokens: envelope.usage?.input_tokens,
             outputTokens: envelope.usage?.output_tokens,
           });
-        if (!metadata.success)
-          throw new Error("Analysis returned invalid usage metadata.");
+        if (!metadata.success) throw new ProviderFailure("invalid_usage");
         config.onResponse(metadata.data);
       }
       return findings;

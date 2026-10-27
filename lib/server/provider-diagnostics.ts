@@ -1,5 +1,21 @@
 import "server-only";
 const messages = {
+  refusal:
+    "The provider declined to assess this copy. No assessment was saved; human review is required.",
+  incomplete_output:
+    "The provider returned an incomplete analysis. No assessment was saved. Create a revised version before retrying.",
+  output_token_limit:
+    "The analysis reached its output limit before completing. No assessment was saved. Create a revised version before retrying.",
+  invalid_json:
+    "The provider returned invalid response JSON. No assessment was saved.",
+  invalid_output_schema:
+    "The analysis response did not match the required finding schema. No assessment was saved.",
+  invalid_evidence:
+    "The analysis response failed exact-evidence or policy verification. No assessment was saved.",
+  invalid_usage:
+    "The provider returned invalid usage metadata. No assessment was saved.",
+  response_limit:
+    "The provider response exceeded its size limit. No assessment was saved.",
   authentication:
     "The analysis provider rejected the server credential. Your draft is saved; the workspace owner must check the provider configuration.",
   permission:

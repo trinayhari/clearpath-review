@@ -37,3 +37,11 @@ The initial assessment RPC accepted owner-supplied findings. This was fixed with
 ## Bounded design audit completion
 
 Explicit modal focus wrapping/restoration, dialog names, form label associations, exact policy navigation/return context, horizontal-only tab strips and measured text contrast are documented in [ACCESSIBILITY-CHECKS.md](ACCESSIBILITY-CHECKS.md). All 27 sampled queue/review text styles exceed 4.5:1 after adjustment; this is not a complete accessibility certification.
+
+## Authenticated-first update — October 27
+
+The main route now validates the Supabase session and directs signed-out visitors to branded sign-in. The isolated sample moved to `/preview`. Real workspace presentation includes account/workspace/role, actionable default filters, compact counts, saved campaign URLs, retained edits during in-app navigation, loading/error/access-pending states, and no fallback to sample data. Missing local configuration explicitly disables sign-in. No hosted membership or Auth account was created by this update.
+
+Validation: production build succeeds; 30 domain/PostgreSQL/provider-transport tests pass; seven local browser scenarios pass. The browser scenarios cover signed-out entry, sample workflow, synthetic workspace responses, failure states, policy context and keyboard behavior. The provider tests use injected synthetic HTTP responses and make no paid calls. Design reviewer inspected desktop and mobile sign-in and sample routes; mobile header spacing and unavailable-setup feedback were corrected.
+
+Still pending: approved marketer/reviewer recipients, supported Auth invitations and email template/redirect configuration, membership provisioning, durable seed execution, actual two-person hosted session and refresh/relogin verification, and a walkthrough of that real persisted loop. No claim here substitutes synthetic tests for actual Auth verification. See ACCOUNT-ONBOARDING.md and LIVE-ANALYSIS-DESIGN.md for exact setup and authorization boundaries.

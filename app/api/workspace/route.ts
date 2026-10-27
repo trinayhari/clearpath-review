@@ -44,6 +44,7 @@ export async function GET() {
     return NextResponse.json(
       {
         userId: user.id,
+        email: user.email,
         members,
         workspaces,
         campaigns: campaigns.map((c) => ({
@@ -55,8 +56,10 @@ export async function GET() {
           status: c.status,
           ownerId: c.owner_id,
           owner:
-            members.find((m) => m.user_id === c.owner_id)?.display_name ??
-            "Team member",
+            members.find(
+              (m) =>
+                m.user_id === c.owner_id && m.workspace_id === c.workspace_id,
+            )?.display_name ?? "Team member",
           updatedAt: c.updated_at,
           submittedAt: c.submitted_at,
           decidedAt: c.decided_at,
@@ -80,8 +83,11 @@ export async function GET() {
             .map((e) => ({
               id: e.id,
               actor:
-                members.find((m) => m.user_id === e.actor_id)?.display_name ??
-                "Team member",
+                members.find(
+                  (m) =>
+                    m.user_id === e.actor_id &&
+                    m.workspace_id === c.workspace_id,
+                )?.display_name ?? "Team member",
               action: e.action,
               versionId: e.version_id,
               at: e.created_at,

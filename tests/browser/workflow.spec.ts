@@ -4,7 +4,7 @@ test("complete isolated evaluator workflow and preserved approval history", asyn
 }) => {
   const browserErrors: string[] = [];
   page.on("pageerror", (e) => browserErrors.push(e.message));
-  await page.goto("/");
+  await page.goto("/preview");
   await expect(
     page.getByRole("heading", { name: "Review queue", exact: true }),
   ).toBeVisible();
@@ -71,7 +71,7 @@ test("complete isolated evaluator workflow and preserved approval history", asyn
 test("queue filters, policy library, analytics, mobile layout and auth denial", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/preview");
   await page.getByLabel("Search campaigns").fill("nothing matches");
   await expect(
     page.getByRole("heading", { name: "No campaigns match" }),
@@ -113,8 +113,8 @@ test("workspace switching scopes queue counters and analytics consistently", asy
   const { seedCampaigns } = await import("../../lib/fixtures");
   const seed = await seedCampaigns();
   const campaigns = [
-    { ...seed[0], workspaceId: "one" },
-    { ...seed[3], workspaceId: "one" },
+    { ...seed[0], workspaceId: "one", ownerId: "evaluator" },
+    { ...seed[3], workspaceId: "one", ownerId: "evaluator" },
     { ...seed[4], workspaceId: "two" },
   ];
   await page.route("**/api/workspace", (route) =>
@@ -133,7 +133,7 @@ test("workspace switching scopes queue counters and analytics consistently", asy
       },
     }),
   );
-  await page.goto("/?workspace=live");
+  await page.goto("/preview?workspace=live");
   await expect(page.getByLabel("Active workspace")).toHaveValue("one");
   await expect(
     page
@@ -146,6 +146,7 @@ test("workspace switching scopes queue counters and analytics consistently", asy
   ).toContainText("0");
   await expect(page.locator("tbody tr")).toHaveCount(2);
   await page.getByLabel("Active workspace").selectOption("two");
+  await page.getByRole("button", { name: "All work", exact: false }).click();
   await expect(page.locator("tbody tr")).toHaveCount(1);
   await expect(
     page
@@ -182,7 +183,7 @@ test("workspace switching scopes queue counters and analytics consistently", asy
 test("review dialogs trap keyboard focus, restore their trigger, and policy citations preserve review context", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/preview");
   await page.getByRole("button", { name: /A little breathing room/ }).click();
   const citation = page.getByRole("link", { name: /View CP-101:/ });
   await citation.click();

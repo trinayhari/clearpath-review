@@ -279,7 +279,12 @@ export function assertTransition(
   }
 }
 
-export type Membership = { user_id: string; workspace_id: string; role: Role };
+export type Membership = {
+  user_id: string;
+  workspace_id: string;
+  role: Role;
+  display_name?: string;
+};
 export function roleForWorkspace(
   members: Membership[],
   userId: string,

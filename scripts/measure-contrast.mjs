@@ -3,7 +3,7 @@ const browser = await chromium.launch();
 const page = await browser.newPage({
   ignoreHTTPSErrors: process.env.PLAYWRIGHT_IGNORE_HTTPS_ERRORS === "1",
 });
-await page.goto(process.env.BASE_URL ?? "http://127.0.0.1:3000");
+await page.goto(`${process.env.BASE_URL ?? "http://127.0.0.1:3000"}/preview`);
 if (process.argv.includes("--review"))
   await page.getByRole("button", { name: /A little breathing room/ }).click();
 const selectors = process.argv.includes("--review")

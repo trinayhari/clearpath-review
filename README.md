@@ -4,7 +4,9 @@ A production-minded marketing compliance review vertical slice for **fictional C
 
 ## Evaluate the product
 
-`/` opens a fully interactive, isolated fictional demo. Each browser tab gets its own in-memory state. No demo decisions are sent to Supabase, persisted, or treated as real authorizations. The persona selector **simulates** marketer/reviewer behavior solely in this sandbox. Refresh resets the demo.
+`/` opens the authenticated workspace, or redirects to branded sign-in. Follow [individual account onboarding](docs/ACCOUNT-ONBOARDING.md) for invitations and explicit marketer/reviewer memberships. Saved campaign links survive refresh; reviewers default to pending reviews and marketers to their own work.
+
+`/preview` opens a fully interactive, isolated fictional sample. Each browser tab gets its own in-memory state. No demo decisions are sent to Supabase, persisted, or treated as real authorizations. The persona selector **simulates** marketer/reviewer behavior solely in this sandbox. Refresh resets the demo.
 
 1. Create a new submission: personal loan / email, with “Get guaranteed approval for your personal loan today. Explore a brighter financial future with ClearPath.”
 2. Run precheck. Open the exact evidence and fictional policy reference. Preview the suggested replacement, including full revised copy.
@@ -14,7 +16,7 @@ A production-minded marketing compliance review vertical slice for **fictional C
 6. Switch to Maya and create v3. The campaign returns to Draft; v2 retains its historical approval, which does not apply to v3.
 7. Explore search, product/status filters, policy library and record-derived analytics. A new unchecked draft offers mock timeout/error controls; failures preserve copy.
 
-`/login` opens the separate authenticated workspace. Normal signup alone does **not** grant access to the seeded fictional workspace. The app does not expose signup or self-enrollment; even an identity created through Supabase remains without workspace access until an administrator inserts the membership below. Individual Supabase accounts and administrator-provisioned workspace memberships are required. There are **no shared passwords, anonymous reviewer accounts, client-side role overrides, service-role keys, or auth bypasses**. The public demo does not establish authenticated production approval verification.
+`/login` signs into the primary authenticated workspace. Normal signup alone does **not** grant access to the seeded fictional workspace. The app does not expose signup or self-enrollment; even an identity created through Supabase remains without workspace access until an administrator inserts the membership below. Individual Supabase accounts and administrator-provisioned workspace memberships are required. There are **no shared passwords, anonymous reviewer accounts, client-side role overrides, service-role keys, or auth bypasses**. The public demo does not establish authenticated production approval verification.
 
 ## Stack and commands
 
@@ -29,7 +31,7 @@ npm run typecheck
 npm run build
 ```
 
-The public demo works without environment variables. Authenticated endpoints fail closed without configuration. Cookie sessions use `@supabase/ssr`; API handlers validate identity using `auth.getUser()`, and refresh cookies through the response cookie store. User-specific data is fetched through uncached API requests; the root page itself contains only fictional fixtures.
+The public demo works without environment variables. Authenticated endpoints fail closed without configuration. Cookie sessions use `@supabase/ssr`; API handlers validate identity using `auth.getUser()`, and refresh cookies through the response cookie store. User-specific data is fetched through uncached API requests; the root page contains no fixture data; session validation and cookie refresh run in `proxy.ts`.
 
 ## Database setup and evaluator roles
 
@@ -46,7 +48,7 @@ values ('00000000-0000-4000-8000-000000000001', '<auth-user-uuid>', 'marketer', 
 -- Repeat for a separate person, with role='reviewer'.
 ```
 
-For isolated evaluation groups, create a separate `cp_workspaces` row and provision only those people's memberships. Memberships are administrator-managed; no web endpoint can promote a user. The authenticated empty state guides provisioned marketers to create a draft. Rich fixtures are confined to the sandbox so public visitors cannot read another evaluator's work.
+For isolated evaluation groups, create a separate `cp_workspaces` row and provision only those people's memberships. Memberships are administrator-managed; no web endpoint can promote a user. The authenticated empty state guides provisioned marketers to create a draft. The approved marketer can seed durable fictional drafts and pending reviews with `scripts/seed-authenticated.mjs`; it uses ordinary authenticated RPCs and creates no fake human decisions. Public visitors cannot read this workspace.
 
 ## Architecture and security
 
@@ -96,6 +98,6 @@ The Supabase CLI migration-creation command was attempted but could not initiali
 
 ## Delivered instance
 
-Public demo: https://clearpath-review-livid.vercel.app · Source: https://github.com/trinayhari/clearpath-review . The owner explicitly approved public fictional source publication. See [verification evidence and remaining validation boundary](docs/VERIFICATION.md).
+Application: https://clearpath-review-livid.vercel.app · Optional sample: https://clearpath-review-livid.vercel.app/preview · Source: https://github.com/trinayhari/clearpath-review . The owner explicitly approved public fictional source publication. See [verification evidence and remaining validation boundary](docs/VERIFICATION.md).
 
 Hosted workflow verification can also run `scripts/verify-hosted-rollback.sql` through an authorized management connection. It uses synthetic identity UUIDs and JWT claims inside one transaction, creates no passwords/sessions/invitations, and rolls back every fixture. This verifies hosted PostgreSQL workflow/RLS execution, **not** the email/password login or cookie-refresh path. Individual evaluator account provisioning remains required for that separate browser test.

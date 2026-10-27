@@ -31,6 +31,11 @@ export function AccountForm({ email }: { email: string }) {
             setSaved(false);
             if (password !== data.get("confirmation")) {
               setError("The passwords do not match.");
+              (
+                form.elements.namedItem(
+                  "confirmation",
+                ) as HTMLInputElement | null
+              )?.focus();
               return;
             }
             setBusy(true);
@@ -58,6 +63,15 @@ export function AccountForm({ email }: { email: string }) {
             }
           }}
         >
+          <label htmlFor="account-email">Account email</label>
+          <input
+            id="account-email"
+            name="username"
+            type="email"
+            autoComplete="username"
+            value={email}
+            readOnly
+          />
           <label htmlFor="new-password">New password</label>
           <input
             id="new-password"
@@ -78,6 +92,12 @@ export function AccountForm({ email }: { email: string }) {
           <input
             id="confirm-password"
             name="confirmation"
+            aria-invalid={error === "The passwords do not match."}
+            aria-describedby={
+              error === "The passwords do not match."
+                ? "password-error"
+                : undefined
+            }
             type="password"
             autoComplete="new-password"
             minLength={12}
@@ -86,7 +106,7 @@ export function AccountForm({ email }: { email: string }) {
             disabled={busy}
           />
           {error && (
-            <div className="alert error" role="alert">
+            <div id="password-error" className="alert error" role="alert">
               {error}
             </div>
           )}

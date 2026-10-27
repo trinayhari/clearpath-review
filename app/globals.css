@@ -2187,3 +2187,38 @@ th,
   font-size: 13px;
   margin-bottom: 18px;
 }
+
+.account-shell {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  display: grid;
+  gap: 24px;
+}
+.account-shell .login-card {
+  width: 100%;
+}
+.account-shell h1 {
+  font-size: 24px;
+  margin-bottom: 12px;
+}
+.account-shell h2 {
+  margin-top: 28px;
+  font-size: 18px;
+}
+.account-shell form {
+  display: grid;
+  gap: 12px;
+}
+.account-shell input {
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: white;
+}
+.account-shell #password-help {
+  font-size: 13px;
+  margin: 0 0 10px;
+  color: #475569;
+}

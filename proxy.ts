@@ -5,7 +5,7 @@ export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL,
     key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
   if (!url || !key) {
-    if (request.nextUrl.pathname === "/")
+    if (["/", "/account"].includes(request.nextUrl.pathname))
       return NextResponse.redirect(
         new URL("/login?setup=required", request.url),
       );
@@ -28,7 +28,7 @@ export async function proxy(request: NextRequest) {
     error,
   } = await client.auth.getUser();
   let redirectTo: string | undefined;
-  if (request.nextUrl.pathname === "/" && (!user || error))
+  if (["/", "/account"].includes(request.nextUrl.pathname) && (!user || error))
     redirectTo = "/login";
   if (request.nextUrl.pathname === "/login" && user && !error) redirectTo = "/";
   if (redirectTo) {
@@ -40,4 +40,4 @@ export async function proxy(request: NextRequest) {
   response.headers.set("Cache-Control", "private, no-store, max-age=0");
   return response;
 }
-export const config = { matcher: ["/", "/login"] };
+export const config = { matcher: ["/", "/login", "/account"] };

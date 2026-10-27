@@ -403,6 +403,11 @@ export default function Workspace({
           ))}
         </nav>
         <div className="sidebar-bottom">
+          {live && (
+            <a className="nav-item" href="/account">
+              Account &amp; sign-in
+            </a>
+          )}
           <div className="safe-note">
             <ShieldCheck size={19} />
             <strong>Human judgment, always.</strong>

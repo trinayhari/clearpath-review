@@ -4,7 +4,7 @@ A production-minded marketing compliance review vertical slice for **fictional C
 
 ## Evaluate the product
 
-`/` opens the authenticated workspace, or redirects to branded sign-in. Follow [individual account onboarding](docs/ACCOUNT-ONBOARDING.md) for invitations and explicit marketer/reviewer memberships. Saved campaign links survive refresh; reviewers default to pending reviews and marketers to their own work.
+`/` opens the authenticated workspace, or redirects to branded sign-in. Follow [individual account onboarding](docs/ACCOUNT-ONBOARDING.md) for invitations and explicit marketer/reviewer memberships. Authenticated users can optionally set their own password under **Account & sign-in**, then use password login without another email; no shared credentials are provisioned. Saved campaign links survive refresh; reviewers default to pending reviews and marketers to their own work.
 
 `/preview` opens a fully interactive, isolated fictional sample. Each browser tab gets its own in-memory state. No demo decisions are sent to Supabase, persisted, or treated as real authorizations. The persona selector **simulates** marketer/reviewer behavior solely in this sandbox. Refresh resets the demo.
 

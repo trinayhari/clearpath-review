@@ -11,6 +11,10 @@ import {
   readJsonBody,
   RequestInputError,
 } from "@/lib/server/http";
+import {
+  emailRateLimitMessage,
+  setAccountPassword,
+} from "@/lib/server/account-auth";
 const inputSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("login"),
@@ -38,6 +42,12 @@ const inputSchema = z.discriminatedUnion("action", [
     expectedUserId: z.uuid(),
   }),
   z.object({ action: z.literal("logout") }),
+  z
+    .object({
+      action: z.literal("set_password"),
+      password: z.string().min(12).max(200),
+    })
+    .strict(),
 ]);
 export async function POST(req: NextRequest) {
   try {
@@ -48,6 +58,13 @@ export async function POST(req: NextRequest) {
       );
     const input = inputSchema.parse(await readJsonBody(req, 8192)),
       db = await serverClient();
+    if (input.action === "set_password") {
+      const result = await setAccountPassword(db.auth, input.password);
+      return NextResponse.json(result, {
+        status: result.status,
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
     if (input.action === "preview_invite" || input.action === "accept_invite") {
       const verifier = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -88,14 +105,9 @@ export async function POST(req: NextRequest) {
           emailRedirectTo: `${verifiedRequestOrigin(req)}/auth/confirm`,
         },
       });
-      if (error && error.status === 429)
-        return NextResponse.json(
-          {
-            error:
-              "Please wait a minute before requesting another sign-in link.",
-          },
-          { status: 429 },
-        );
+      const rateMessage = error && emailRateLimitMessage(error);
+      if (rateMessage)
+        return NextResponse.json({ error: rateMessage }, { status: 429 });
       if (error && error.status && error.status >= 500)
         return NextResponse.json(
           {

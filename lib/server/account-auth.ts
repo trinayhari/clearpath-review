@@ -18,10 +18,10 @@ export async function setAccountPassword(
     data: { user },
     error,
   } = await auth.getUser();
-  if (error || !user?.id || !user.email_confirmed_at || user.is_anonymous)
+  if (error || !user?.id || user.is_anonymous)
     return {
       status: 401,
-      error: "Sign in with your verified account before setting a password.",
+      error: "Sign in with your account before setting a password.",
     };
   const result = await auth.updateUser({ password });
   if (result.error) {

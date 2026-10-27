@@ -16,14 +16,14 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
   await db.connect();
   try {
     await db.query(
-      `drop schema if exists public cascade;create schema public;drop schema if exists private cascade;drop schema if exists auth cascade;create schema auth;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;do $$begin if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin;end if;if not exists(select 1 from pg_roles where rolname='anon') then create role anon nologin;end if;end$$;grant usage on schema public,auth to authenticated,anon;grant execute on function auth.uid() to authenticated,anon;`,
+      `drop schema if exists public cascade;create schema public;drop schema if exists private cascade;drop schema if exists auth cascade;create schema auth;create table auth.users(id uuid primary key, is_anonymous boolean default false);create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;do $$begin if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated nologin;end if;if not exists(select 1 from pg_roles where rolname='anon') then create role anon nologin;end if;end$$;grant usage on schema public,auth to authenticated,anon;grant execute on function auth.uid() to authenticated,anon;`,
     );
     for (const file of fs
       .readdirSync("supabase/migrations")
       .filter((f) => f.endsWith(".sql"))
       .sort())
       await db.query(fs.readFileSync(`supabase/migrations/${file}`, "utf8"));
-    await db.query(`insert into auth.users values($1),($2),($3),($4);`, [
+    await db.query(`insert into auth.users(id) values($1),($2),($3),($4);`, [
       uid(10),
       uid(11),
       uid(12),
@@ -437,6 +437,9 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
         /permission denied/,
       );
     });
+    const { testSignupIsolation } = await import("./helpers/signup-isolation");
+    await db.query("reset role");
+    await testSignupIsolation(t, db, connectionString);
     const { testTrustedRuntime } = await import("./helpers/trusted-runtime");
     await db.query("reset role");
     await testTrustedRuntime(t, db, connectionString);

@@ -24,7 +24,6 @@ test("email quota is distinct from request throttling and promises no reset time
 test("password changes require a verified nonanonymous user before invoking updateUser", async () => {
   for (const user of [
     null,
-    { id: "u" },
     { id: "u", email_confirmed_at: "now", is_anonymous: true },
   ]) {
     let writes = 0;
@@ -43,7 +42,7 @@ test("password changes require a verified nonanonymous user before invoking upda
 });
 test("password update sends only the entered password and safely handles Auth rejection", async () => {
   const getUser = async () => ({
-    data: { user: { id: "u", email_confirmed_at: "now" } },
+    data: { user: { id: "u", email_confirmed_at: null } },
     error: null,
   });
   let input: unknown;

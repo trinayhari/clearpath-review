@@ -163,3 +163,44 @@ test("account settings reject signed-out access and password writes", async ({
   });
   expect(status).toBe(401);
 });
+
+test("password signup explains isolation and preserves existing-account collision without reset", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
+  await page
+    .getByRole("button", { name: "New here? Create an account" })
+    .click();
+  await expect(page.getByText(/No confirmation email required/)).toBeVisible();
+  await expect(page.getByText(/Email ownership is not verified/)).toBeVisible();
+  let payload: Record<string, unknown> = {};
+  await page.route("**/api/auth", async (route) => {
+    payload = route.request().postDataJSON();
+    await route.fulfill({
+      status: 400,
+      json: {
+        error:
+          "Unable to create this account. If you already have an account, sign in with your existing password.",
+      },
+    });
+  });
+  await page
+    .getByLabel("Email", { exact: true })
+    .fill("fictional@example.invalid");
+  await page
+    .getByLabel("Password", { exact: true })
+    .fill("synthetic-password-only");
+  await page
+    .getByRole("button", { name: "Create account", exact: true })
+    .click();
+  await expect(page.locator("p[role=alert]")).toContainText("existing password");
+  expect(Object.keys(payload).sort()).toEqual(["action", "email", "password"]);
+  expect(payload.action).toBe("signup");
+  await page
+    .getByRole("button", { name: "Already have an account? Sign in" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Sign in to ClearPath Review" }),
+  ).toBeVisible();
+});

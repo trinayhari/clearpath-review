@@ -8,7 +8,6 @@ export default async function Account() {
     data: { user },
     error,
   } = await db.auth.getUser();
-  if (error || !user || !user.email_confirmed_at || user.is_anonymous)
-    redirect("/login");
+  if (error || !user || user.is_anonymous) redirect("/login");
   return <AccountForm email={user.email ?? "Your account"} />;
 }

@@ -132,6 +132,24 @@ export default function Workspace({
     ),
   );
   async function load() {
+    if (mode === "live") {
+      const initialized = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "initialize_workspace" }),
+      });
+      if (initialized.status === 401) {
+        location.replace("/login?expired=1");
+        throw new Error("Your session expired. Sign in again.");
+      }
+      if (!initialized.ok) {
+        const result = await initialized.json();
+        throw new Error(
+          result.error ||
+            "Workspace setup could not finish. Retry without creating another account.",
+        );
+      }
+    }
     const r = await fetch("/api/workspace");
     const data = await r.json();
     if (r.status === 401) {

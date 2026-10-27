@@ -7,7 +7,7 @@ import { Brand } from "@/components/auth/brand";
 export default function Login() {
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [method, setMethod] = useState<"email_link" | "login">("email_link"),
+    [method, setMethod] = useState<"email_link" | "login" | "signup">("login"),
     [sent, setSent] = useState(false),
     [email, setEmail] = useState("");
   const [setupRequired, setSetupRequired] = useState(false);
@@ -41,8 +41,16 @@ export default function Login() {
       </section>
       <section className="auth-form-area">
         <div className="login-card">
-          <h2>Sign in to ClearPath Review</h2>
-          <p>Use the work email associated with your invitation.</p>
+          <h2>
+            {method === "signup"
+              ? "Create your ClearPath account"
+              : "Sign in to ClearPath Review"}
+          </h2>
+          <p>
+            {method === "signup"
+              ? "Start in your own private workspace. No confirmation email required."
+              : "Use your email and password to return to your saved work."}
+          </p>
           {setupRequired ? (
             <div className="alert error" role="alert">
               Workspace sign-in is not configured on this instance. The owner
@@ -80,7 +88,9 @@ export default function Login() {
                       action: method,
                       email,
                       password:
-                        method === "login" ? form.get("password") : undefined,
+                        method !== "email_link"
+                          ? form.get("password")
+                          : undefined,
                     }),
                   });
                   const data = await r.json();
@@ -94,17 +104,17 @@ export default function Login() {
                 }
               }}
             >
-              <label htmlFor="signin-email">Work email</label>
+              <label htmlFor="signin-email">Email</label>
               <input
                 id="signin-email"
                 type="email"
                 required
-                autoComplete="email"
+                autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
+                placeholder="you@example.com"
               />
-              {method === "login" && (
+              {method !== "email_link" && (
                 <>
                   <label htmlFor="signin-password">Password</label>
                   <input
@@ -112,10 +122,21 @@ export default function Login() {
                     name="password"
                     type="password"
                     required
-                    autoComplete="current-password"
-                    minLength={8}
+                    autoComplete={
+                      method === "signup" ? "new-password" : "current-password"
+                    }
+                    minLength={method === "signup" ? 12 : 8}
+                    maxLength={200}
                   />
                 </>
+              )}
+              {method === "signup" && (
+                <p className="signup-note">
+                  Use at least 12 characters. Email ownership is not verified in
+                  this take-home. Signup creates marketer access only to your
+                  own workspace; it does not grant access to an existing team or
+                  reviewer permissions.
+                </p>
               )}
               {error && (
                 <p role="alert" className="alert error">
@@ -127,41 +148,54 @@ export default function Login() {
                   ? "Please wait…"
                   : method === "email_link"
                     ? "Email me a sign-in link"
-                    : "Sign in"}
+                    : method === "signup"
+                      ? "Create account"
+                      : "Sign in"}
                 <ArrowRight size={16} />
               </Button>
               <button
                 type="button"
                 className="auth-method"
+                disabled={busy}
                 onClick={() => {
-                  setMethod(method === "login" ? "email_link" : "login");
+                  setMethod(method === "signup" ? "login" : "signup");
                   setError("");
                 }}
               >
-                {method === "login"
-                  ? "Use an email sign-in link instead"
-                  : "Use a password instead"}
+                {method === "signup"
+                  ? "Already have an account? Sign in"
+                  : "New here? Create an account"}
               </button>
+              {method !== "signup" && (
+                <button
+                  type="button"
+                  className="auth-method"
+                  disabled={busy}
+                  onClick={() => {
+                    setMethod(method === "email_link" ? "login" : "email_link");
+                    setError("");
+                  }}
+                >
+                  {method === "email_link"
+                    ? "Use a password instead"
+                    : "Invited without a password? Use an email link"}
+                </button>
+              )}
             </form>
           )}
           <details className="access-help">
             <summary>Joining your team for the first time?</summary>
             <p>
-              Open the invitation sent to your work email. Workspace access is
-              assigned separately: the person who invited you must add your
-              account as Marketing or Compliance reviewer.
+              Create an account to start your own isolated workspace. To join an
+              existing team, its owner must authorize your individual account
+              separately. Signing in alone does not grant access to a team’s
+              campaigns.
             </p>
             <p>
-              No invitation yet? Send your work email and intended role to the
-              person who shared this workspace with you. They can use the{" "}
-              <a
-                href="https://github.com/trinayhari/clearpath-review/blob/main/docs/ACCOUNT-ONBOARDING.md"
-                target="_blank"
-                rel="noreferrer"
-              >
-                workspace owner’s setup steps
-              </a>
-              . Signing in alone does not grant access to a team’s campaigns.
+              New accounts can draft campaigns and run mock prechecks. Human
+              decisions require a separately authorized reviewer. Existing
+              invited accounts keep their assigned role; signup cannot reset an
+              existing account’s password.
             </p>
           </details>
           <div className="auth-security">

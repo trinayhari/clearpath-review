@@ -4,7 +4,7 @@ A production-minded marketing compliance review vertical slice for **fictional C
 
 ## Evaluate the product
 
-`/` opens the authenticated workspace, or redirects to branded sign-in. Follow [individual account onboarding](docs/ACCOUNT-ONBOARDING.md) for invitations and explicit marketer/reviewer memberships. Authenticated users can optionally set their own password under **Account & sign-in**, then use password login without another email; no shared credentials are provisioned. Saved campaign links survive refresh; reviewers default to pending reviews and marketers to their own work.
+`/` opens the authenticated workspace, or redirects to branded sign-in. Create an account with email and password; no confirmation email is required for this take-home. Signup gives you a new isolated workspace with marketer access. See [account onboarding](docs/ACCOUNT-ONBOARDING.md) for existing-team access and reviewer provisioning. Authenticated users can optionally set their own password under **Account & sign-in**, then use password login without another email; no shared credentials are provisioned. Saved campaign links survive refresh; reviewers default to pending reviews and marketers to their own work.
 
 `/preview` opens a fully interactive, isolated fictional sample. Each browser tab gets its own in-memory state. No demo decisions are sent to Supabase, persisted, or treated as real authorizations. The persona selector **simulates** marketer/reviewer behavior solely in this sandbox. Refresh resets the demo.
 
@@ -16,7 +16,7 @@ A production-minded marketing compliance review vertical slice for **fictional C
 6. Switch to Maya and create v3. The campaign returns to Draft; v2 retains its historical approval, which does not apply to v3.
 7. Explore search, product/status filters, policy library and record-derived analytics. A new unchecked draft offers mock timeout/error controls; failures preserve copy.
 
-`/login` signs into the primary authenticated workspace. Normal signup alone does **not** grant access to the seeded fictional workspace. The app does not expose signup or self-enrollment; even an identity created through Supabase remains without workspace access until an administrator inserts the membership below. Individual Supabase accounts and administrator-provisioned workspace memberships are required. There are **no shared passwords, anonymous reviewer accounts, client-side role overrides, service-role keys, or auth bypasses**. The public demo does not establish authenticated production approval verification.
+`/login` offers password sign-in and signup. New accounts receive only their own isolated workspace, never the seeded evaluator workspace or reviewer access. Existing memberships remain unchanged. Email addresses are unverified identifiers in this take-home, not proof of business identity; no email/domain/user-editable metadata determines authorization. There are **no shared passwords, anonymous reviewer accounts, client-side role overrides, service-role keys, or auth bypasses**. Human review requires a separately authorized reviewer. The optional email-link path remains for previously invited accounts without passwords. The public sample does not establish authenticated production approval verification.
 
 ## Stack and commands
 
@@ -35,9 +35,9 @@ The public demo works without environment variables. Authenticated endpoints fai
 
 ## Database setup and evaluator roles
 
-Hosted migrations: `supabase/migrations/20261026170000_review_workflow.sql` and `supabase/migrations/20261026172000_database_owned_assessments.sql`. The third migration, `20261027012748_reserved_trusted_external_analysis.sql`, is a locally verified, inactive runtime candidate awaiting hosted approval; do not imply it is already applied. Seed: `supabase/seed.sql` creates only a fictional workspace, never accounts or credentials.
+Hosted migrations: `supabase/migrations/20261026170000_review_workflow.sql`, `supabase/migrations/20261026172000_database_owned_assessments.sql`, and `supabase/migrations/20261027033000_isolated_signup_workspace.sql`. The third migration, `20261027012748_reserved_trusted_external_analysis.sql`, is a locally verified, inactive runtime candidate awaiting hosted approval; do not imply it is already applied. Seed: `supabase/seed.sql` creates only a fictional workspace, never accounts or credentials.
 
-Apply the migration to a dedicated Supabase project with the CLI or an authorized management connection. Never run test bootstrap SQL on a deployed database. The migration was verified against isolated PostgreSQL 17 and applied to project `tztlatsflqjlfadipguu`. All six public tables have RLS enabled. Supabase security advisors returned no findings after application.
+Apply the migration to a dedicated Supabase project with the CLI or an authorized management connection. Never run test bootstrap SQL on a deployed database. The migration was verified against isolated PostgreSQL 17 and applied to project `tztlatsflqjlfadipguu`. All six public tables have RLS enabled. Current security advisors report an intentional no-policy INFO for the default-deny private onboarding map and a WARN for disabled leaked-password protection; see readiness limitations.
 
 Evaluator access is provisioned by the project administrator after each evaluator has their own authenticated identity. Use distinct identities for marketer and reviewer. Credentials are delivered privately through the organization's existing process. Do not put them in source, README, environment variables, or the demo.
 

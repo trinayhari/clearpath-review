@@ -2225,3 +2225,8 @@ th,
 .account-shell .brand {
   font-size: 20px;
 }
+.signup-note {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #475569;
+}

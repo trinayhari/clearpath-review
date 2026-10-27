@@ -15,12 +15,21 @@ import {
   emailRateLimitMessage,
   setAccountPassword,
 } from "@/lib/server/account-auth";
+import { passwordAuth } from "@/lib/server/password-auth";
 const inputSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("login"),
     email: z.email().max(254),
     password: z.string().min(8).max(200),
   }),
+  z
+    .object({
+      action: z.literal("signup"),
+      email: z.email().max(254),
+      password: z.string().min(12).max(200),
+    })
+    .strict(),
+  z.object({ action: z.literal("initialize_workspace") }).strict(),
   z.object({ action: z.literal("email_link"), email: z.email().max(254) }),
   z.object({
     action: z.literal("exchange"),
@@ -58,6 +67,34 @@ export async function POST(req: NextRequest) {
       );
     const input = inputSchema.parse(await readJsonBody(req, 8192)),
       db = await serverClient();
+    if (input.action === "signup" || input.action === "login") {
+      const result = await passwordAuth(db, input);
+      return NextResponse.json(result, {
+        status: result.status,
+        headers: { "Cache-Control": "no-store" },
+      });
+    }
+    if (input.action === "initialize_workspace") {
+      const {
+        data: { user },
+        error,
+      } = await db.auth.getUser();
+      if (error || !user || user.is_anonymous)
+        return NextResponse.json(
+          { error: "Sign in to initialize your workspace." },
+          { status: 401 },
+        );
+      const result = await db.rpc("cp_initialize_workspace");
+      if (result.error)
+        return NextResponse.json(
+          {
+            error:
+              "Your account is signed in, but workspace setup could not finish. Retry without creating another account.",
+          },
+          { status: 503 },
+        );
+      return NextResponse.json({ ok: true });
+    }
     if (input.action === "set_password") {
       const result = await setAccountPassword(db.auth, input.password);
       return NextResponse.json(result, {
@@ -128,26 +165,19 @@ export async function POST(req: NextRequest) {
     const result =
       input.action === "logout"
         ? await db.auth.signOut({ scope: "local" })
-        : input.action === "login"
-          ? await db.auth.signInWithPassword({
-              email: input.email,
-              password: input.password,
-            })
-          : input.action === "exchange"
-            ? await db.auth.exchangeCodeForSession(input.code)
-            : await db.auth.verifyOtp({
-                token_hash: input.tokenHash,
-                type: input.type,
-              });
+        : input.action === "exchange"
+          ? await db.auth.exchangeCodeForSession(input.code)
+          : await db.auth.verifyOtp({
+              token_hash: input.tokenHash,
+              type: input.type,
+            });
     if (result.error)
       return NextResponse.json(
         {
           error:
-            input.action === "login"
-              ? "Unable to sign in. Check your email and password."
-              : input.action === "logout"
-                ? "Unable to sign out. Please try again."
-                : "This sign-in link is invalid or expired. Request a new link.",
+            input.action === "logout"
+              ? "Unable to sign out. Please try again."
+              : "This sign-in link is invalid or expired. Request a new link.",
         },
         { status: 400 },
       );

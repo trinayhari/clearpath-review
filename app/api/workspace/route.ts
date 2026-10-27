@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { serverClient, configured } from "@/lib/supabase";
 import { contentSchema, safeAssessment } from "@/lib/domain";
 import { z } from "zod";
+import { liveAnalysisForWorkspace } from "@/lib/server/analysis-access";
 import { randomUUID } from "node:crypto";
 import { runTrustedAnalysis } from "@/lib/server/trusted-analysis";
 import {
@@ -53,14 +54,14 @@ export async function GET() {
       results.map((r) => r.data!);
     return NextResponse.json(
       {
-        analysisMode:
-          process.env.CLEARPATH_LIVE_ANALYSIS_ENABLED === "true"
-            ? "openai"
-            : "mock",
+        analysisMode: "mock",
         userId: user.id,
         email: user.email,
         members,
-        workspaces,
+        workspaces: workspaces.map((w) => ({
+          ...w,
+          analysisMode: liveAnalysisForWorkspace(w.id) ? "openai" : "mock",
+        })),
         campaigns: campaigns.map((c) => ({
           id: c.id,
           workspaceId: c.workspace_id,
@@ -158,10 +159,24 @@ export async function POST(req: NextRequest) {
       input.data = {
         note: z.string().trim().min(3).max(4000).parse(input.data.note),
       };
+    let useLiveAnalysis = false;
     if (
       input.action === "analyze" &&
       process.env.CLEARPATH_LIVE_ANALYSIS_ENABLED === "true"
     ) {
+      const campaign = await db
+        .from("cp_campaigns")
+        .select("workspace_id")
+        .eq("id", z.uuid().parse(input.campaignId))
+        .single();
+      if (campaign.error || !campaign.data)
+        return NextResponse.json(
+          { error: "Campaign access denied." },
+          { status: 403 },
+        );
+      useLiveAnalysis = liveAnalysisForWorkspace(campaign.data.workspace_id);
+    }
+    if (input.action === "analyze" && useLiveAnalysis) {
       const result = await runTrustedAnalysis(
         db,
         {

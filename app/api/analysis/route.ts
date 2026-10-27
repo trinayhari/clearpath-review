@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { liveAnalysisForWorkspace } from "@/lib/server/analysis-access";
 import { z } from "zod";
 import { serverClient } from "@/lib/supabase";
 import { runTrustedAnalysis } from "@/lib/server/trusted-analysis";
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
       { error: "Invalid request origin." },
       { status: 403 },
     );
-  // No enabled value or signing credential is deployed. Public preview never invokes this route.
+  // Public preview never invokes this authenticated, explicitly allowlisted route.
   if (process.env.CLEARPATH_LIVE_ANALYSIS_ENABLED !== "true")
     return NextResponse.json(
       { error: "Live analysis is not enabled." },
@@ -39,6 +40,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Sign in to your workspace." },
         { status: 401 },
+      );
+    const campaign = await db
+      .from("cp_campaigns")
+      .select("workspace_id")
+      .eq("id", input.campaignId)
+      .single();
+    if (
+      campaign.error ||
+      !campaign.data ||
+      !liveAnalysisForWorkspace(campaign.data.workspace_id)
+    )
+      return NextResponse.json(
+        { error: "Live analysis is not enabled for this workspace." },
+        { status: 403 },
       );
     const result = await runTrustedAnalysis(
       db,

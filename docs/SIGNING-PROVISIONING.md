@@ -1,4 +1,4 @@
-# Signing provisioning plan — approval required; not executed
+# Signing provisioning and bounded activation
 
 Target only Supabase `tztlatsflqjlfadipguu` and Vercel project `prj_umtJoMItJCqtFwfw4z6pv7WVI6OB`, production environment. Use the latest reviewed migration `20261027012748_reserved_trusted_external_analysis.sql`; its reservation RPC now requires server proof. Deploy the matching runtime code before activation.
 
@@ -19,6 +19,7 @@ Vercel variables:
 - `CLEARPATH_ANALYSIS_SIGNING_KEY`: returned 64-character hex value; **sensitive, production only**.
 - `CLEARPATH_ANALYSIS_KEY_ID`: `clearpath-test-20261027-v1`; production only.
 - `CLEARPATH_LIVE_ANALYSIS_ENABLED`: absent or `false` during staging. Do not enable as part of secret transfer.
+- `CLEARPATH_LIVE_ANALYSIS_WORKSPACES`: comma-separated exact approved workspace UUIDs, production only. The server and UI default other workspaces to mock even when the global flag is on. The database allowlist is separately required and remains authoritative.
 - Existing `OPENAI_API_KEY` remains in place and is never retrieved/exported.
 
 Insert configuration disabled, without overwriting any unexpected existing row:
@@ -38,3 +39,5 @@ Verify only nonsecret metadata: key ID/disabled flag, byte length=32, expected V
 After a separate approved activation step and matching deployment, enable the key, the one global configuration row, and the named workspace, then set the server enablement flag. Execute only the approved authenticated fictional runtime requests. Disable the flag/global limit after bounded validation unless ongoing operation is separately approved. A valid key alone cannot approve campaigns or bypass owner/membership checks.
 
 Rotation: create a new approved ID and sensitive value; never overwrite existing secret bytes. Reservations and signatures pin their key ID. Keep any prior key enabled only for its explicitly approved short in-flight window; setting its `enabled=false` revokes verification immediately. All provisioning and rotation require the corresponding action-time approval.
+
+October 27 approved setup checkpoint: migration applied as hosted version `20261027041442`. Parent securely provisioned the disabled 32-byte key and production-only signing variables, inserted disabled global $2 limits and the disabled exact QA workspace allowlist. Runtime code requires the matching nonsecret workspace env allowlist before activation. No credentials or secret transfer are repeated by the implementation agent. Enable only after the parent verifies config and matching runtime readiness; disable live calls after bounded validation as approved.

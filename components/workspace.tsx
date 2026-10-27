@@ -86,9 +86,9 @@ export default function Workspace({
   });
   const [policyContext, setPolicyContext] = useState<string | null>(null);
   const [memberships, setMemberships] = useState<Membership[]>([]);
-  const [workspaces, setWorkspaces] = useState<{ id: string; name: string }[]>(
-    [],
-  );
+  const [workspaces, setWorkspaces] = useState<
+    { id: string; name: string; analysisMode?: "mock" | "openai" }[]
+  >([]);
   const [clock, setClock] = useState<number | null>(null);
   useEffect(() => setClock(Date.now()), []);
   const [campaigns, setCampaigns] = useState(initial),
@@ -157,7 +157,6 @@ export default function Workspace({
       throw new Error("Your session expired. Sign in again to continue.");
     }
     if (!r.ok) throw new Error(data.error);
-    setAnalysisMode(data.analysisMode === "openai" ? "openai" : "mock");
     setCampaigns(data.campaigns);
     setUserId(data.userId);
     setMemberships(data.members);
@@ -167,6 +166,13 @@ export default function Workspace({
       data.members.find((m: Membership) => m.user_id === data.userId)
         ?.workspace_id ||
       "";
+    setAnalysisMode(
+      data.workspaces.find(
+        (w: { id: string; analysisMode?: string }) => w.id === targetWorkspace,
+      )?.analysisMode === "openai"
+        ? "openai"
+        : "mock",
+    );
     const member = data.members.find(
       (m: Membership) =>
         m.user_id === data.userId && m.workspace_id === targetWorkspace,
@@ -192,6 +198,14 @@ export default function Workspace({
       setViewVersion(requestedCampaign.versions.length - 1);
       setContent(requestedCampaign.versions.at(-1)!.content);
       setWorkspaceId(requestedCampaign.workspaceId!);
+      setAnalysisMode(
+        data.workspaces.find(
+          (w: { id: string; analysisMode?: string }) =>
+            w.id === requestedCampaign.workspaceId,
+        )?.analysisMode === "openai"
+          ? "openai"
+          : "mock",
+      );
       setRole(
         roleForWorkspace(
           data.members,
@@ -545,6 +559,12 @@ export default function Workspace({
                     nextMember?.role === "reviewer" ? "In review" : "My work",
                   );
                   setWorkspaceId(e.target.value);
+                  setAnalysisMode(
+                    workspaces.find((w) => w.id === e.target.value)
+                      ?.analysisMode === "openai"
+                      ? "openai"
+                      : "mock",
+                  );
                   setRole(
                     roleForWorkspace(memberships, userId, e.target.value) ??
                       "marketer",

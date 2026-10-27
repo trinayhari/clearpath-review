@@ -35,7 +35,7 @@ The public demo works without environment variables. Authenticated endpoints fai
 
 ## Database setup and evaluator roles
 
-Hosted migrations: `supabase/migrations/20261026170000_review_workflow.sql`, `supabase/migrations/20261026172000_database_owned_assessments.sql`, and `supabase/migrations/20261027033000_isolated_signup_workspace.sql`. The third migration, `20261027012748_reserved_trusted_external_analysis.sql`, is a locally verified, inactive runtime candidate awaiting hosted approval; do not imply it is already applied. Seed: `supabase/seed.sql` creates only a fictional workspace, never accounts or credentials.
+Hosted migrations: `supabase/migrations/20261026170000_review_workflow.sql`, `supabase/migrations/20261026172000_database_owned_assessments.sql`, and `supabase/migrations/20261027033000_isolated_signup_workspace.sql`. The analysis migration `20261027012748_reserved_trusted_external_analysis.sql` is now hosted (version `20261027041442`) after explicit approval; live execution remains disabled until the approved signing/configuration checks and runtime validation. Seed: `supabase/seed.sql` creates only a fictional workspace, never accounts or credentials.
 
 Apply the migration to a dedicated Supabase project with the CLI or an authorized management connection. Never run test bootstrap SQL on a deployed database. The migration was verified against isolated PostgreSQL 17 and applied to project `tztlatsflqjlfadipguu`. All six public tables have RLS enabled. Current security advisors report an intentional no-policy INFO for the default-deny private onboarding map and a WARN for disabled leaked-password protection; see readiness limitations.
 

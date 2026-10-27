@@ -72,16 +72,19 @@ declare body jsonb; k private.cp_ai_keys; expected bytea; supplied bytea; diff i
 end $$;
 revoke all on function private.cp_ai_verify(text,text,text) from public,anon,authenticated;
 
-create function private.cp_reserve_analysis(p_campaign uuid,p_version uuid,p_request uuid) returns jsonb language plpgsql security definer set search_path='' as $$
-declare c public.cp_campaigns; v public.cp_versions; lim private.cp_ai_limits; run private.cp_ai_runs; begin
+create function private.cp_reserve_analysis(p_campaign uuid,p_version uuid,p_request uuid,p_payload text,p_signature text) returns jsonb language plpgsql security definer set search_path='' as $$
+declare c public.cp_campaigns; v public.cp_versions; lim private.cp_ai_limits; run private.cp_ai_runs; proof jsonb; begin
  if auth.uid() is null then raise exception 'Authentication required'; end if;
  -- Lock order everywhere: campaign, then global budget, then execution.
  select * into c from public.cp_campaigns where id=p_campaign for update;
  if c.id is null or not exists(select 1 from public.cp_members where workspace_id=c.workspace_id and user_id=auth.uid() and role='marketer') or c.owner_id<>auth.uid() then raise exception 'Campaign owner required'; end if;
  if c.current_version is distinct from p_version then raise exception 'Stale version. Refresh before continuing.'; end if;
  if c.status not in ('Draft','Changes requested') then raise exception 'Campaign is locked'; end if;
+ proof:=private.cp_ai_verify(p_payload,p_signature,'clearpath-analysis-reserve-v1');
+ if proof->>'actorId' is distinct from auth.uid()::text or proof->>'campaignId' is distinct from p_campaign::text or proof->>'versionId' is distinct from p_version::text or proof->>'requestId' is distinct from p_request::text then raise exception 'Analysis reservation proof mismatch'; end if;
  select * into lim from private.cp_ai_limits where singleton for update;
  if lim.singleton is null or not lim.enabled or not exists(select 1 from private.cp_ai_keys where id=lim.active_key and enabled) or not exists(select 1 from private.cp_ai_workspaces where workspace_id=c.workspace_id and enabled) then raise exception 'Live analysis is not enabled'; end if;
+ if proof->>'keyId' is distinct from lim.active_key then raise exception 'Analysis reservation key mismatch'; end if;
  if p_request is null then raise exception 'Analysis request ID required'; end if;
  select * into run from private.cp_ai_runs where actor_id=auth.uid() and request_id=p_request;
  if run.id is not null and (run.campaign_id<>c.id or run.version_id<>p_version) then raise exception 'Analysis request ID already used'; end if;
@@ -99,11 +102,11 @@ declare c public.cp_campaigns; v public.cp_versions; lim private.cp_ai_limits; r
  select * into v from public.cp_versions where id=run.version_id;
  return jsonb_build_object('id',run.id,'actorId',run.actor_id,'workspaceId',run.workspace_id,'campaignId',run.campaign_id,'versionId',run.version_id,'contentHash',run.content_hash,'policyBundle',run.policy_bundle,'model',run.model,'keyId',run.key_id,'nonce',run.nonce,'state',run.state,'expiresAt',extract(epoch from run.expires_at),'content',v.content,'product',c.product,'reservedMicrousd',run.reserved_microusd);
 end $$;
-revoke all on function private.cp_reserve_analysis(uuid,uuid,uuid) from public,anon;
-grant execute on function private.cp_reserve_analysis(uuid,uuid,uuid) to authenticated;
-create function public.cp_reserve_analysis(p_campaign uuid,p_version uuid,p_request uuid) returns jsonb language sql security invoker set search_path='' as $$ select private.cp_reserve_analysis(p_campaign,p_version,p_request) $$;
-revoke all on function public.cp_reserve_analysis(uuid,uuid,uuid) from public,anon;
-grant execute on function public.cp_reserve_analysis(uuid,uuid,uuid) to authenticated;
+revoke all on function private.cp_reserve_analysis(uuid,uuid,uuid,text,text) from public,anon;
+grant execute on function private.cp_reserve_analysis(uuid,uuid,uuid,text,text) to authenticated;
+create function public.cp_reserve_analysis(p_campaign uuid,p_version uuid,p_request uuid,p_payload text,p_signature text) returns jsonb language sql security invoker set search_path='' as $$ select private.cp_reserve_analysis(p_campaign,p_version,p_request,p_payload,p_signature) $$;
+revoke all on function public.cp_reserve_analysis(uuid,uuid,uuid,text,text) from public,anon;
+grant execute on function public.cp_reserve_analysis(uuid,uuid,uuid,text,text) to authenticated;
 
 -- Shared execution checks; called only inside explicitly authorized definers.
 create function private.cp_ai_binding(body jsonb,run private.cp_ai_runs) returns boolean language sql immutable security invoker set search_path='' as $$
@@ -231,6 +234,7 @@ declare c public.cp_campaigns; m public.cp_members; v public.cp_versions; new_id
  update public.cp_campaigns set current_version=v.id,status='Draft',updated_at=now(),submitted_at=null,decided_at=null where id=c.id;
  elsif p_action='analyze' then
  if p_data ? 'findings' then raise exception 'Client-supplied findings are not accepted'; end if;
+ if exists(select 1 from private.cp_ai_runs where version_id=v.id) then raise exception 'External analysis owns this version. Create a revision before running mock analysis.'; end if;
  insert into public.cp_analyses(version_id,findings,trusted) values(v.id,private.cp_mock_analysis(v.content,c.product),true);
  elsif p_action='submit' then
  if not exists(select 1 from public.cp_analyses where version_id=v.id and trusted and (provider='deterministic-mock-v2-db' or (provider='openai-responses-v1' and execution_id is not null))) then raise exception 'Trusted precheck required. Create a revision if a legacy assessment exists.'; end if;

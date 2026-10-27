@@ -4,7 +4,7 @@ This is a tested vertical slice for fictional financial marketing reviews, not a
 
 | Area | Status | Evidence / remaining work |
 |---|---|---|
-| Production build and types | Passed | Next.js production build, TypeScript check, 52 local automated domain/database/provider/HTTP tests |
+| Production build and types | Passed | Next.js production build, TypeScript check, 55 local automated domain/database/provider/HTTP tests |
 | Authentication entry | Passed, limited | Root gates on validated `getUser`; signed-out production browser redirects to login; no fixture fallback |
 | Actual invited-account sign-in and session refresh | Unverified | Two aliases approved; built-in sender exact-recipient restriction and Auth URL setup pending. Default invite callback compatibility is locally tested |
 | Workspace isolation and roles | Passed locally; hosted negative checks passed previously | Real PostgreSQL RLS/grants; cross-workspace and same-workspace non-owner mutations rejected; no metadata-based roles |

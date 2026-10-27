@@ -5,6 +5,7 @@ import { randomUUID, createHmac } from "node:crypto";
 import { mockProvider } from "../../lib/domain";
 import {
   signAnalysisPayload,
+  signReservationRequest,
   type Reservation,
   runTrustedAnalysis,
 } from "../../lib/server/trusted-analysis";
@@ -58,14 +59,20 @@ export async function testTrustedRuntime(
     c: { id: string; v: string },
     request = randomUUID(),
     client = db,
-  ) =>
-    (
-      await client.query("select public.cp_reserve_analysis($1,$2,$3) value", [
-        c.id,
-        c.v,
-        request,
-      ])
+  ) => {
+    const actorId = (await client.query("select auth.uid() id")).rows[0].id;
+    const proof = signReservationRequest(
+      { actorId, campaignId: c.id, versionId: c.v, requestId: request },
+      "local-test-key",
+      synthetic,
+    );
+    return (
+      await client.query(
+        "select public.cp_reserve_analysis($1,$2,$3,$4,$5) value",
+        [c.id, c.v, request, proof.p_payload, proof.p_signature],
+      )
     ).rows[0].value as Reservation;
+  };
   const signed = (
     r: Reservation,
     final = false,
@@ -123,7 +130,7 @@ export async function testTrustedRuntime(
     async () => {
       await as(10);
       const c = await create();
-      await assert.rejects(reserve(c), /not enabled/);
+      await assert.rejects(reserve(c), /not enabled|key unavailable/);
     },
   );
   await db.query("reset role");
@@ -652,6 +659,116 @@ export async function testTrustedRuntime(
       ).rows[0];
       assert.equal(saved.state, "failed");
       assert.equal(Number(saved.reserved_microusd), 200000);
+    },
+  );
+
+  await t.test(
+    "untrusted direct reservations cannot consume any allowance",
+    async () => {
+      await reset();
+      const c = await create(),
+        request = randomUUID();
+      await assert.rejects(
+        db.query("select public.cp_reserve_analysis($1,$2,$3,null,null)", [
+          c.id,
+          c.v,
+          request,
+        ]),
+        /signature/,
+      );
+      const proof = signReservationRequest(
+        {
+          actorId: uid(10),
+          campaignId: c.id,
+          versionId: c.v,
+          requestId: request,
+        },
+        "local-test-key",
+        synthetic,
+      );
+      await assert.rejects(
+        db.query("select public.cp_reserve_analysis($1,$2,$3,$4,$5)", [
+          c.id,
+          c.v,
+          request,
+          proof.p_payload,
+          "0".repeat(64),
+        ]),
+        /signature/,
+      );
+      await assert.rejects(
+        db.query("select public.cp_reserve_analysis($1,$2,$3,$4,$5)", [
+          c.id,
+          c.v,
+          randomUUID(),
+          proof.p_payload,
+          proof.p_signature,
+        ]),
+        /proof mismatch/,
+      );
+      await db.query("reset role");
+      assert.equal(
+        (await db.query("select * from private.cp_ai_runs")).rowCount,
+        0,
+      );
+    },
+  );
+  await t.test(
+    "mock analysis cannot race or replace a reserved external execution",
+    async () => {
+      await reset();
+      const c = await create(),
+        r = await reserve(c);
+      await assert.rejects(cmd("analyze", c.id, c.v), /External analysis owns/);
+      await execute("start", signed(r));
+      await assert.rejects(cmd("analyze", c.id, c.v), /External analysis owns/);
+      await execute(
+        "finalize",
+        signed(r, true, { outcome: "failed", errorCode: "timeout" }),
+      );
+      await assert.rejects(cmd("analyze", c.id, c.v), /External analysis owns/);
+      assert.equal(
+        (
+          await db.query(
+            "select * from public.cp_analyses where version_id=$1",
+            [c.v],
+          )
+        ).rowCount,
+        0,
+      );
+    },
+  );
+  await t.test(
+    "concurrent mock analysis and external reservation have exactly one owner",
+    async () => {
+      await reset();
+      const c = await create();
+      const other = new pg.Client({ connectionString });
+      await other.connect();
+      await as(10, other);
+      try {
+        const outcomes = await Promise.allSettled([
+          reserve(c),
+          other.query("select public.cp_command('analyze',$1,$2,'{}'::jsonb)", [
+            c.id,
+            c.v,
+          ]),
+        ]);
+        assert.equal(
+          outcomes.filter((r) => r.status === "fulfilled").length,
+          1,
+        );
+      } finally {
+        await other.end();
+      }
+      await db.query("reset role");
+      const totals = (
+        await db.query(
+          "select (select count(*) from private.cp_ai_runs where version_id=$1)+(select count(*) from public.cp_analyses where version_id=$1) total",
+          [c.v],
+        )
+      ).rows[0];
+      assert.equal(Number(totals.total), 1);
     },
   );
   await db.query("reset role");

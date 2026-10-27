@@ -55,6 +55,33 @@ export function signAnalysisPayload(
       .digest("hex"),
   };
 }
+export function signReservationRequest(
+  input: {
+    actorId: string;
+    campaignId: string;
+    versionId: string;
+    requestId: string;
+  },
+  keyId: string,
+  secretHex: string,
+) {
+  if (!/^[a-f0-9]{64,128}$/.test(secretHex) || secretHex.length % 2 !== 0)
+    throw new Error("Analysis signing configuration is invalid.");
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const p_payload = JSON.stringify({
+    ...input,
+    keyId,
+    audience: "clearpath-analysis-reserve-v1",
+    issuedAt,
+    expiresAt: issuedAt + 90,
+  });
+  return {
+    p_payload,
+    p_signature: createHmac("sha256", Buffer.from(secretHex, "hex"))
+      .update(p_payload, "utf8")
+      .digest("hex"),
+  };
+}
 export async function runTrustedAnalysis(
   db: Pick<SupabaseClient, "rpc">,
   input: {
@@ -88,6 +115,7 @@ export async function runTrustedAnalysis(
       p_campaign: input.campaignId,
       p_version: input.versionId,
       p_request: input.requestId,
+      ...signReservationRequest(input, config.keyId, config.signingSecretHex),
     }),
   );
   if (

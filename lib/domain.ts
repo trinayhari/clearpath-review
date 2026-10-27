@@ -141,11 +141,11 @@ export const mockProvider: AnalysisProvider = {
   async analyze(content, product, mode = "normal") {
     if (mode === "timeout")
       throw new Error(
-        "Mock analysis timed out. Your draft is safe. Try again.",
+        "Precheck timed out. Your draft is safe. Try again.",
       );
     if (mode === "error")
       throw new Error(
-        "Mock analysis is unavailable. Your draft is safe. Try again.",
+        "Precheck is unavailable. Your draft is safe. Try again.",
       );
     const findings: Omit<
       Finding,
@@ -186,7 +186,7 @@ export const mockProvider: AnalysisProvider = {
       "CP-204",
       "Verify product terms and disclosures",
       "Medium",
-      "The mock provider has no approved product-rate source. A human must verify this claim.",
+      "No approved product-rate source is available. A human must verify this claim.",
       null,
       "Unverified: rates, fees and savings cannot be substantiated from submitted copy alone.",
     );

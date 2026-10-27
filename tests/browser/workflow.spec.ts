@@ -39,7 +39,7 @@ test("complete isolated evaluator workflow and preserved approval history", asyn
   ).toBeVisible();
   await page.getByRole("button", { name: "Submit v2 for review" }).click();
   await expect(page.getByLabel("Edit marketing copy")).toHaveCount(0);
-  await page.getByLabel("Demo role").selectOption("reviewer");
+  await page.getByLabel("Preview role").selectOption("reviewer");
   await page.screenshot({
     path: "artifacts/review-desktop.png",
     fullPage: true,
@@ -63,7 +63,7 @@ test("complete isolated evaluator workflow and preserved approval history", asyn
   ).toBeVisible();
   await page.getByRole("button", { name: "Activity", exact: true }).click();
   await expect(page.getByText("approved this version")).toBeVisible();
-  await page.getByLabel("Demo role").selectOption("marketer");
+  await page.getByLabel("Preview role").selectOption("marketer");
   await page.getByRole("button", { name: "Save as v3" }).click();
   await expect(
     page.getByRole("status").filter({ hasText: "New immutable version" }),
@@ -206,7 +206,7 @@ test("review dialogs trap keyboard focus, restore their trigger, and policy cita
       "nowrap",
     );
   }
-  await page.getByLabel("Demo role").selectOption("reviewer");
+  await page.getByLabel("Preview role").selectOption("reviewer");
   const trigger = page.getByRole("button", {
     name: "Record decision",
     exact: true,
@@ -360,6 +360,6 @@ test("stored OpenAI provenance remains visible when new live analysis is disable
     }),
   ).toBeVisible();
   await expect(
-    page.getByText("Mock precheck · deterministic rules", { exact: true }),
+    page.getByText("Rules-based precheck", { exact: true }),
   ).toHaveCount(0);
 });

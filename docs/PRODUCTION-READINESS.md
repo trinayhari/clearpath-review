@@ -14,7 +14,7 @@ This is a tested vertical slice for fictional financial marketing reviews, not a
 | Immutable audit and analysis | Passed locally | Direct app writes revoked; immutable triggers; caller-supplied mock findings rejected |
 | Safe operational errors | Passed | Fixed message catalogue; raw database errors not returned; stale/concurrent actions classified; uncertain results require refresh |
 | Input/output bounds | Passed | Streamed request-body limit, content/note schemas, response size/finding limits and full output validation |
-| Browser workflow/accessibility | Passed, bounded | Nine local scenarios for the callback candidate; prior production bbf0be4 passed eight; independent desktop/mobile review; focus trapping and policy return; not full WCAG certification |
+| Browser workflow/accessibility | Passed, bounded | Nine local and production scenarios at deployed 7de0bfa; independent desktop/mobile review; focus trapping and policy return; not full WCAG certification |
 | Mock assessment trust | Passed | Database computes from stored version; provenance required; no AI approval |
 | External provider parsing/failure handling | Passed with synthetic transport | Schema, excerpts, applicability, refusal, incomplete response, timeout and rate-limit paths |
 | Actual paid provider validation | Blocked | One-off two-request Vercel build was rejected by automatic approval review; zero calls executed from this attempt |

@@ -1,4 +1,6 @@
-# Verification — 26 October 2026
+# Verification — updated 27 October 2026
+
+Current deployed source `7de0bfa`: production build, 52 local automated tests and **nine local/production browser scenarios pass**. Default invitation callback compatibility is verified with synthetic tokens, not actual email delivery. Live analysis remains disabled; the trusted runtime migration is local only. Earlier dated sections below preserve the validation history.
 
 - Production: https://clearpath-review-livid.vercel.app
 - Source: https://github.com/trinayhari/clearpath-review (public with explicit owner approval)
@@ -54,4 +56,4 @@ The reliability follow-up passes 35 domain/PostgreSQL/provider/HTTP tests and ei
 
 ## Trusted runtime candidate — local only
 
-52 local automated tests pass including the reservation/HMAC/finalization system with real PostgreSQL and synthetic provider transport. The candidate migration is not hosted and no production signing credential or enabled configuration exists. The prior public baseline bbf0be4 passed eight production browser scenarios. The callback candidate passes nine local browser scenarios, including default invitation root landing, URL scrubbing and explicit account confirmation with synthetic tokens. Source includes explicit server-only imports, durable global budget/quota reservations, exact binding/schema/evidence checks, key revocation and replay/concurrency/failure tests. The retired build-time paid-validation script was deleted; no paid call was retried or substituted. Account aliases are approved but parent is coordinating invitation/configuration. Actual runtime Auth/provider/persistence validation remains pending.
+52 local automated tests pass including the reservation/HMAC/finalization system with real PostgreSQL and synthetic provider transport. The candidate migration is not hosted and no production signing credential or enabled configuration exists. The prior public baseline bbf0be4 passed eight production browser scenarios. The callback release at `7de0bfa` passes nine local and production browser scenarios, including default invitation root landing, URL scrubbing and explicit account confirmation with synthetic tokens. Source includes explicit server-only imports, durable global budget/quota reservations, exact binding/schema/evidence checks, key revocation and replay/concurrency/failure tests. The retired build-time paid-validation script was deleted; no paid call was retried or substituted. Account aliases are approved but parent is coordinating invitation/configuration. Actual runtime Auth/provider/persistence validation remains pending.

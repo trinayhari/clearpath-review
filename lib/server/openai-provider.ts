@@ -1,5 +1,5 @@
 import "server-only";
-// Server-only adapter. Deliberately not wired to an HTTP route or the public preview.
+// Server-only adapter. Runtime callers require a signed database claim; public preview never imports this.
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {

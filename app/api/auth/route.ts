@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serverClient } from "@/lib/supabase";
 import { z } from "zod";
+import {
+  verifiedRequestOrigin,
+  readJsonBody,
+  RequestInputError,
+} from "@/lib/server/http";
 const inputSchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("login"),
-    email: z.email(),
+    email: z.email().max(254),
     password: z.string().min(8).max(200),
   }),
-  z.object({ action: z.literal("email_link"), email: z.email() }),
+  z.object({ action: z.literal("email_link"), email: z.email().max(254) }),
   z.object({
     action: z.literal("exchange"),
     code: z.string().min(1).max(4096),
@@ -21,12 +26,12 @@ const inputSchema = z.discriminatedUnion("action", [
 ]);
 export async function POST(req: NextRequest) {
   try {
-    if (req.headers.get("origin") !== req.nextUrl.origin)
+    if (!verifiedRequestOrigin(req))
       return NextResponse.json(
         { error: "Invalid request origin." },
         { status: 403 },
       );
-    const input = inputSchema.parse(await req.json()),
+    const input = inputSchema.parse(await readJsonBody(req, 8192)),
       db = await serverClient();
     if (input.action === "email_link") {
       // Never creates a public signup or grants membership. Generic reply avoids email enumeration.
@@ -34,7 +39,7 @@ export async function POST(req: NextRequest) {
         email: input.email,
         options: {
           shouldCreateUser: false,
-          emailRedirectTo: `${req.nextUrl.origin}/auth/confirm`,
+          emailRedirectTo: `${verifiedRequestOrigin(req)}/auth/confirm`,
         },
       });
       if (error && error.status === 429)
@@ -96,11 +101,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error:
-          e instanceof z.ZodError
-            ? "Check the required sign-in fields."
-            : "Sign-in is temporarily unavailable. Please try again.",
+          e instanceof RequestInputError
+            ? e.message
+            : e instanceof z.ZodError
+              ? "Check the required sign-in fields."
+              : "Sign-in is temporarily unavailable. Please try again.",
       },
-      { status: 400 },
+      {
+        status:
+          e instanceof RequestInputError
+            ? e.status
+            : e instanceof z.ZodError
+              ? 400
+              : 503,
+      },
     );
   }
 }

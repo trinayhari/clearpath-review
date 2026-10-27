@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { serverClient, configured } from "@/lib/supabase";
 import { contentSchema, safeAssessment } from "@/lib/domain";
 import { z } from "zod";
+import {
+  verifiedRequestOrigin,
+  readJsonBody,
+  RequestInputError,
+  workflowFailure,
+} from "@/lib/server/http";
 const command = z.object({
   action: z.enum([
     "create",
@@ -114,7 +120,7 @@ export async function POST(req: NextRequest) {
         { error: "Authenticated workspace is not configured." },
         { status: 503 },
       );
-    if (req.headers.get("origin") !== req.nextUrl.origin)
+    if (!verifiedRequestOrigin(req))
       return NextResponse.json(
         { error: "Invalid request origin" },
         { status: 403 },
@@ -128,7 +134,7 @@ export async function POST(req: NextRequest) {
         { error: "Authentication required" },
         { status: 401 },
       );
-    const input = command.parse(await req.json());
+    const input = command.parse(await readJsonBody(req));
     if (input.action === "create")
       input.data = {
         ...contentSchema.parse(input.data),
@@ -151,19 +157,24 @@ export async function POST(req: NextRequest) {
       p_version: input.versionId ?? null,
       p_data: input.data,
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      const failure = workflowFailure(error);
+      return NextResponse.json(
+        { error: failure.message },
+        { status: failure.status },
+      );
+    }
     return NextResponse.json({ id: data });
   } catch (e) {
+    const failure =
+      e instanceof RequestInputError
+        ? { status: e.status, message: e.message }
+        : e instanceof z.ZodError
+          ? { status: 400, message: "Please check your input." }
+          : workflowFailure(e);
     return NextResponse.json(
-      {
-        error:
-          e instanceof z.ZodError
-            ? "Please check your input."
-            : e instanceof Error
-              ? e.message
-              : "Action failed.",
-      },
-      { status: 400 },
+      { error: failure.message },
+      { status: failure.status },
     );
   }
 }

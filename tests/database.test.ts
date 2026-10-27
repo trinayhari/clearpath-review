@@ -23,10 +23,11 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
       .filter((f) => f.endsWith(".sql"))
       .sort())
       await db.query(fs.readFileSync(`supabase/migrations/${file}`, "utf8"));
-    await db.query(`insert into auth.users values($1),($2),($3);`, [
+    await db.query(`insert into auth.users values($1),($2),($3),($4);`, [
       uid(10),
       uid(11),
       uid(12),
+      uid(13),
     ]);
     await db.query(`insert into public.cp_workspaces values($1,'A'),($2,'B')`, [
       uid(1),
@@ -35,6 +36,10 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
     await db.query(
       `insert into public.cp_members values($1,$2,'marketer','Maya'),($1,$3,'reviewer','Alex'),($4,$5,'reviewer','Other')`,
       [uid(1), uid(10), uid(11), uid(2), uid(12)],
+    );
+    await db.query(
+      "insert into public.cp_members values($1,$2,'marketer','Second marketer')",
+      [uid(1), uid(13)],
     );
     const as = async (id: number) => {
       await db.query("reset role");
@@ -110,6 +115,25 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
     await assert.rejects(
       cmd("analyze", cid, v1, { findings: [] }),
       /Client-supplied findings/,
+    );
+    await t.test(
+      "same-workspace marketer cannot mutate another owner's draft",
+      async () => {
+        await as(13);
+        assert.equal(
+          (await db.query("select id from cp_campaigns where id=$1", [cid]))
+            .rowCount,
+          1,
+        );
+        for (const action of ["revise", "analyze", "submit"])
+          await assert.rejects(
+            cmd(action, cid, v1, {
+              content: "Another marketer must not overwrite this copy.",
+            }),
+            /owner required/,
+          );
+        await as(10);
+      },
     );
     await cmd("analyze", cid, v1);
     const persisted = (
@@ -218,6 +242,63 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
             )
           ).rowCount,
           1,
+        );
+      },
+    );
+    await t.test(
+      "new revision invalidates current approval but preserves its exact-version event",
+      async () => {
+        await as(10);
+        await cmd("revise", cid, v2, {
+          content:
+            "Explore a revised personal loan message. Eligibility and underwriting apply.",
+        });
+        const campaign = (
+          await db.query(
+            "select status,current_version,decided_at,submitted_at from cp_campaigns where id=$1",
+            [cid],
+          )
+        ).rows[0];
+        assert.equal(campaign.status, "Draft");
+        assert.notEqual(campaign.current_version, v2);
+        assert.equal(campaign.decided_at, null);
+        assert.equal(campaign.submitted_at, null);
+        assert.equal(
+          (
+            await db.query(
+              "select id from cp_events where version_id=$1 and action='approve'",
+              [v2],
+            )
+          ).rowCount,
+          1,
+        );
+        assert.equal(
+          (
+            await db.query(
+              "select id from cp_events where version_id=$1 and action='approve'",
+              [campaign.current_version],
+            )
+          ).rowCount,
+          0,
+        );
+        await cmd("analyze", cid, campaign.current_version);
+        await cmd("submit", cid, campaign.current_version);
+        await db.query("reset role");
+        await db.query(
+          "update cp_members set role='reviewer' where workspace_id=$1 and user_id=$2",
+          [uid(1), uid(10)],
+        );
+        await as(10);
+        await assert.rejects(
+          cmd("approve", cid, campaign.current_version, {
+            note: "I must not approve my own work.",
+          }),
+          /Independent reviewer/,
+        );
+        await db.query("reset role");
+        await db.query(
+          "update cp_members set role='marketer' where workspace_id=$1 and user_id=$2",
+          [uid(1), uid(10)],
         );
       },
     );

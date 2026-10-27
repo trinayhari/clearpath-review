@@ -72,3 +72,34 @@ test("reusable URL session tokens are rejected and removed without being exchang
   expect(new URL(page.url()).hash).toBe("");
   expect(calls).toBe(0);
 });
+test("auth rejects oversized and malformed bodies before contacting identity provider", async ({
+  page,
+}) => {
+  await page.goto("/login");
+  const results = await page.evaluate(async () => {
+    const cases = [
+      ["application/json", "x".repeat(9000)],
+      ["application/json", "{"],
+      ["text/plain", "{}"],
+    ];
+    return Promise.all(
+      cases.map(async ([type, body]) => {
+        const response = await fetch("/api/auth", {
+          method: "POST",
+          headers: { "Content-Type": type },
+          body,
+        });
+        return {
+          status: response.status,
+          cache: response.headers.get("cache-control"),
+          body: await response.json(),
+        };
+      }),
+    );
+  });
+  expect(results.map((r) => r.status)).toEqual([413, 400, 415]);
+  for (const result of results) {
+    expect(result.cache).toContain("no-store");
+    expect(result.body.error).toBeTruthy();
+  }
+});

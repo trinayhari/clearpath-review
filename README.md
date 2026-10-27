@@ -20,7 +20,7 @@ A production-minded marketing compliance review vertical slice for **fictional C
 
 ## Stack and commands
 
-Node 24, Next.js App Router, React, TypeScript, Tailwind v4, shadcn-style Button (Radix Slot/CVA; `components.json`), Lucide, Supabase PostgreSQL/Auth. Exact versions and `package-lock.json` are committed. No paid model usage has occurred. A disabled server-only OpenAI runtime candidate is implemented and locally tested; production still uses mock analysis pending explicit activation. See [trusted runtime design](docs/LIVE-ANALYSIS-DESIGN.md).
+Node 24, Next.js App Router, React, TypeScript, Tailwind v4, shadcn-style Button (Radix Slot/CVA; `components.json`), Lucide, Supabase PostgreSQL/Auth. Exact versions and `package-lock.json` are committed. A server-only OpenAI runtime is implemented and activated only for the approved QA workspace during bounded validation. One authenticated analysis attempt failed without storing an assessment; actual provider spend is unknown and its $0.20 reservation remains accounted for. The saved credential’s model access is verified, but successful live analysis is not yet established. Other workspaces remain mock-only. See [trusted runtime design](docs/LIVE-ANALYSIS-DESIGN.md).
 
 ```sh
 npm ci

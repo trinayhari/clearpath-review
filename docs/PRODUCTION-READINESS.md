@@ -4,7 +4,7 @@ This is a tested vertical slice for fictional financial marketing reviews, not a
 
 | Area | Status | Evidence / remaining work |
 |---|---|---|
-| Production build and types | Passed | Next.js production build, TypeScript check, 67 local automated domain/database/provider/HTTP tests |
+| Production build and types | Passed | Next.js production build, TypeScript check, 70 local automated domain/database/provider/HTTP tests |
 | Authentication entry | Passed, limited | Root gates on validated `getUser`; signed-out production browser redirects to login; no fixture fallback |
 | Actual signup/login and session refresh | Passed for approved QA identities | Real password signup, refresh, logout and password relogin passed for two isolated QA users; earlier invitation delivery also verified, email-link quota remains a limitation |
 | Workspace isolation and roles | Passed locally and in actual QA requests | Real PostgreSQL RLS/grants; cross-workspace and same-workspace non-owner mutations rejected; no metadata-based roles |
@@ -17,9 +17,9 @@ This is a tested vertical slice for fictional financial marketing reviews, not a
 | Browser workflow/accessibility | Passed, bounded | Eleven deployed regression scenarios at 09c25fa plus actual authenticated QA loop; independent desktop/mobile review; focus trapping and policy return; not full WCAG certification |
 | Mock assessment trust | Passed | Database computes from stored version; provenance required; no AI approval |
 | External provider parsing/failure handling | Passed with synthetic transport | Schema, excerpts, applicability, refusal, incomplete response, timeout and rate-limit paths |
-| Actual paid provider validation | Pending controlled activation | New authenticated runtime test explicitly approved within cumulative $2 cap; no paid request yet. The earlier rejected build-side test is retired, not retried |
-| Provider persistence and provenance | Hosted, disabled pending validation | Reviewed migration applied; signing key/config securely provisioned disabled by parent; ordinary user RPC cannot forge external findings |
-| Cost controls | Hosted, disabled pending validation | Database-owned cumulative $2 global ceiling, $0.20 permanent reservation/attempt, durable quotas and no refunds/retries. Exact QA workspace also gated in server/UI; arbitrary signups remain mock |
+| Actual paid provider validation | Failed first attempt; diagnosis bounded | One real request failed safely; no assessment/usage stored, $0.20 retained reservation. Read-only model access succeeds. Original error category was discarded; sanitized diagnostics now deployed. No second analysis yet |
+| Provider persistence and provenance | Hosted; success path unverified with real model | Reservation/start/signed failure persisted in production; ordinary user RPC cannot forge external findings. Actual successful provider finalization still pending |
+| Cost controls | Active for bounded QA validation | Database-owned cumulative $2 global ceiling, $0.20 permanent reservation/attempt, durable quotas and no refunds/retries. Exact QA workspace also gated in server/UI; arbitrary signups remain mock |
 | Auth rate limiting | Platform-managed; operational verification pending | Uses Supabase Auth limits; 429 handled. Do not claim a tested distributed custom rate limiter |
 | Campaign API abuse controls | Partial | Auth/RLS, bounded inputs, per-version immutable assessment and locked workflow; distributed user/IP quotas are not implemented |
 | Durable starting campaigns | Prepared, not executed | User-scoped seed script requires approved marketer session and workspace; never invents reviewer decisions |

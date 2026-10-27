@@ -22,10 +22,20 @@ import {
   Sparkles,
   X,
   Users,
+  MoreHorizontal,
+  Archive,
+  RotateCcw,
+  Trash2,
+  GitPullRequest,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Modal } from "./ui/modal";
 import { TeamPanel } from "./team-panel";
+import { ReviewChanges } from "./review-changes";
+import {
+  ReviewLifecycleDialog,
+  type LifecycleAction,
+} from "./review-lifecycle-dialog";
 import {
   applicablePolicies,
   roleForWorkspace,
@@ -51,6 +61,10 @@ const actionLabels: Record<string, string> = {
   request_changes: "requested changes",
   comment: "commented",
   assign: "assigned a reviewer",
+  close: "closed the review",
+  reopen: "reopened the review",
+  delete: "moved the review to Trash",
+  restore: "restored the review",
 };
 const date = (s: string) =>
   new Date(s).toLocaleDateString("en-US", {
@@ -106,6 +120,11 @@ export default function Workspace({
           },
         ],
   );
+  const [queueSegment, setQueueSegment] = useState<"open" | "closed" | "trash">(
+    "open",
+  );
+  const [lifecycleAction, setLifecycleAction] =
+    useState<LifecycleAction | null>(null);
   const [reviewerChoice, setReviewerChoice] = useState("");
   const [previewReviewerId, setPreviewReviewerId] = useState("demo-alex");
   const [workspaces, setWorkspaces] = useState<
@@ -158,6 +177,15 @@ export default function Workspace({
       rule?.scrollIntoView({ block: "center" });
     }
   }, [tab, policyContext]);
+  function beginLifecycle(action: LifecycleAction) {
+    const menu = document.querySelector<HTMLDetailsElement>(
+      ".review-action-menu",
+    );
+    menu?.removeAttribute("open");
+    menu?.querySelector<HTMLElement>("summary")?.focus();
+    setError("");
+    setLifecycleAction(action);
+  }
   const current = campaigns.find((c) => c.id === selected);
   const latest = current?.versions.at(-1);
   const version = current?.versions[viewVersion] ?? latest;
@@ -169,8 +197,12 @@ export default function Workspace({
       (e) => e.action === "analysis_failed" && e.versionId === latest.id,
     ),
   );
+  const reviewActive = Boolean(
+    current && !current.deletedAt && current.lifecycle !== "closed",
+  );
   const editable = Boolean(
     current &&
+    reviewActive &&
     role === "marketer" &&
     (!live || current.ownerId === userId) &&
     ["Draft", "Changes requested", "Approved", "Rejected"].includes(
@@ -360,6 +392,10 @@ export default function Workspace({
           };
         const next = demoCommand(current, role, action, latest.id, {
           ...data,
+          actorId: activeUserId,
+          isTeamOwner:
+            workspaces.find((w) => w.id === workspaceId)?.owner_id ===
+            activeUserId,
           actor: memberships.find(
             (m) => m.user_id === activeUserId && m.workspace_id === workspaceId,
           )?.display_name,
@@ -370,20 +406,27 @@ export default function Workspace({
           setContent(next.versions.at(-1)!.content);
         }
       }
+      const lifecycleNotices: Record<string, string> = {
+        close: "Review closed. The discussion and history are preserved.",
+        reopen: "Review reopened with its existing version and status.",
+        delete: "Review moved to Trash. You can restore it from the Trash tab.",
+        restore: "Review restored with its versions and history intact.",
+      };
       setNotice(
-        action === "revise"
-          ? "New immutable version saved. Run precheck again before submitting."
-          : action === "analyze"
-            ? live && analysisMode === "openai"
-              ? "OpenAI precheck complete. Human review is still required."
-              : "Mock precheck complete. Human review is still required."
-            : action === "submit"
-              ? "Version submitted. Content is now locked for human review."
-              : action === "assign"
-                ? "Reviewer assigned. The submitted content stays locked."
-                : action === "comment"
-                  ? "Comment added to this version."
-                  : "Decision recorded against this exact version.",
+        lifecycleNotices[action] ||
+          (action === "revise"
+            ? "New immutable version saved. Run precheck again before submitting."
+            : action === "analyze"
+              ? live && analysisMode === "openai"
+                ? "OpenAI precheck complete. Human review is still required."
+                : "Mock precheck complete. Human review is still required."
+              : action === "submit"
+                ? "Version submitted. Content is now locked for human review."
+                : action === "assign"
+                  ? "Reviewer assigned. The submitted content stays locked."
+                  : action === "comment"
+                    ? "Comment added to this version."
+                    : "Decision recorded against this exact version."),
       );
       if (action === "revise")
         setDraftEdits((previous) => {
@@ -394,6 +437,19 @@ export default function Workspace({
       setNote("");
       setPreview(null);
       setDecision(null);
+      setLifecycleAction(null);
+      if (["delete", "restore", "close", "reopen"].includes(action)) {
+        setQueueSegment(
+          action === "delete"
+            ? "trash"
+            : action === "close"
+              ? "closed"
+              : action === "restore" && current.lifecycle === "closed"
+                ? "closed"
+                : "open",
+        );
+        setFilter("All work");
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -413,20 +469,35 @@ export default function Workspace({
     reviewerChoice ||
     current?.reviewerId ||
     (reviewers.length === 1 ? reviewers[0].user_id : "");
-  const scopedCampaigns = campaigns.filter(
+  const canManageReview = Boolean(
+    current &&
+    (current.ownerId === activeUserId ||
+      workspaces.find((w) => w.id === workspaceId)?.owner_id === activeUserId),
+  );
+  const teamCampaigns = campaigns.filter(
     (c) => (c.workspaceId || "demo-team") === workspaceId,
   );
+  const scopedCampaigns = teamCampaigns.filter((c) => !c.deletedAt);
+  const segmentCampaigns = teamCampaigns.filter((c) =>
+    queueSegment === "trash"
+      ? Boolean(c.deletedAt)
+      : !c.deletedAt && (c.lifecycle || "open") === queueSegment,
+  );
   const nextAction = (c: Campaign) =>
-    c.status === "In review"
-      ? `${c.reviewer || "Unassigned reviewer"}: review v${c.versions.at(-1)!.number}`
-      : c.status === "Approved"
-        ? `Approved v${c.versions.at(-1)!.number} · ready to use`
-        : c.status === "Changes requested"
-          ? `${c.owner}: revise the copy`
-          : c.status === "Rejected"
-            ? `${c.owner}: review the rationale`
-            : `${c.owner}: ${c.versions.at(-1)!.analyzed ? "choose reviewer & submit" : "prepare & precheck"}`;
-  const queue = scopedCampaigns
+    c.deletedAt
+      ? "In Trash · restore to continue"
+      : c.lifecycle === "closed"
+        ? "Closed · discussion preserved"
+        : c.status === "In review"
+          ? `${c.reviewer || "Unassigned reviewer"}: review v${c.versions.at(-1)!.number}`
+          : c.status === "Approved"
+            ? `Approved v${c.versions.at(-1)!.number} · ready to use`
+            : c.status === "Changes requested"
+              ? `${c.owner}: revise the copy`
+              : c.status === "Rejected"
+                ? `${c.owner}: review the rationale`
+                : `${c.owner}: ${c.versions.at(-1)!.analyzed ? "choose reviewer & submit" : "prepare & precheck"}`;
+  const queue = segmentCampaigns
     .filter(
       (c) =>
         (filter === "All work" ||
@@ -460,10 +531,10 @@ export default function Workspace({
           (b.status === "In review" ? -1 : 1),
     );
   const inReview = scopedCampaigns.filter(
-    (c) => c.status === "In review",
+    (c) => c.status === "In review" && c.lifecycle !== "closed",
   ).length;
   const changes = scopedCampaigns.filter(
-    (c) => c.status === "Changes requested",
+    (c) => c.status === "Changes requested" && c.lifecycle !== "closed",
   ).length;
   const approved = scopedCampaigns.filter(
     (c) => c.status === "Approved",
@@ -773,7 +844,7 @@ export default function Workspace({
           {(!live ||
             (loadState === "ready" && (workspaceId || tab === "team"))) && (
             <>
-              {error && (
+              {error && !lifecycleAction && (
                 <div className="alert error" role="alert">
                   {error}
                   <button
@@ -852,7 +923,7 @@ export default function Workspace({
               {tab === "queue" && (
                 <>
                   <div className="page-heading">
-                    <div className="eyebrow">KEEP GOOD WORK MOVING</div>
+                    <div className="eyebrow">MARKETING × COMPLIANCE</div>
                     <div className="heading-row">
                       <div>
                         <h1>
@@ -866,8 +937,8 @@ export default function Workspace({
                           {live
                             ? role === "reviewer"
                               ? "Review the submitted copy, discuss changes, and record a version-specific decision."
-                              : "Prepare, revise, and track the campaigns you own."
-                            : "A clear path from first draft to final approval."}
+                              : "Your copy. Your reviewer. Every decision on record."
+                            : "A shared workspace for copy, feedback and decisions."}
                         </p>
                       </div>
                       {role === "marketer" && (
@@ -884,27 +955,35 @@ export default function Workspace({
                       )}
                     </div>
                   </div>
-                  <div className="handoff-guide" aria-label="How reviews work">
-                    <div>
-                      <span>1</span>
-                      <strong>Marketing prepares</strong>
-                      <p>Create a draft and run precheck.</p>
+                  <details className="workflow-help">
+                    <summary>
+                      How a review works <ArrowRight size={14} />
+                    </summary>
+                    <div
+                      className="handoff-guide"
+                      aria-label="How reviews work"
+                    >
+                      <div>
+                        <span>1</span>
+                        <strong>Marketing prepares</strong>
+                        <p>Create a draft and run precheck.</p>
+                      </div>
+                      <div>
+                        <span>2</span>
+                        <strong>Choose a reviewer</strong>
+                        <p>Submit a locked version to a named teammate.</p>
+                      </div>
+                      <div>
+                        <span>3</span>
+                        <strong>Compliance decides</strong>
+                        <p>Approve, request changes or reject with a reason.</p>
+                      </div>
+                      <Button variant="outline" onClick={() => setTab("team")}>
+                        <Users size={16} />
+                        Manage team
+                      </Button>
                     </div>
-                    <div>
-                      <span>2</span>
-                      <strong>Choose a reviewer</strong>
-                      <p>Submit a locked version to a named teammate.</p>
-                    </div>
-                    <div>
-                      <span>3</span>
-                      <strong>Compliance decides</strong>
-                      <p>Approve, request changes or reject with a reason.</p>
-                    </div>
-                    <Button variant="outline" onClick={() => setTab("team")}>
-                      <Users size={16} />
-                      Manage team
-                    </Button>
-                  </div>
+                  </details>
                   {teamMembers.length > 0 &&
                     !teamMembers.some((m) => m.role === "reviewer") && (
                       <div className="workflow-next">
@@ -946,6 +1025,49 @@ export default function Workspace({
                     </div>
                   </div>
                   <div className="panel queue-panel">
+                    <div
+                      className="lifecycle-tabs"
+                      aria-label="Review lifecycle"
+                    >
+                      {(
+                        [
+                          ["open", "Open", GitPullRequest],
+                          ["closed", "Closed", Archive],
+                          ["trash", "Trash", Trash2],
+                        ] as const
+                      ).map(([id, label, Icon]) => (
+                        <button
+                          key={id}
+                          className={queueSegment === id ? "selected" : ""}
+                          aria-pressed={queueSegment === id}
+                          onClick={() => {
+                            setQueueSegment(id);
+                            setFilter("All work");
+                            setSearch("");
+                          }}
+                        >
+                          <Icon size={16} />
+                          {label}
+                          <span>
+                            {
+                              teamCampaigns.filter((c) =>
+                                id === "trash"
+                                  ? Boolean(c.deletedAt)
+                                  : !c.deletedAt &&
+                                    (c.lifecycle || "open") === id,
+                              ).length
+                            }
+                          </span>
+                        </button>
+                      ))}
+                      <span className="lifecycle-help">
+                        {queueSegment === "trash"
+                          ? "Removed reviews · history retained"
+                          : queueSegment === "closed"
+                            ? "Finished or paused · reopen anytime"
+                            : "Active drafts and reviews"}
+                      </span>
+                    </div>
                     <div className="queue-tabs">
                       {[
                         ...(role === "marketer"
@@ -965,7 +1087,7 @@ export default function Workspace({
                         >
                           {s === "In review" ? "Awaiting review" : s}
                           {s === "All work" && (
-                            <span>{scopedCampaigns.length}</span>
+                            <span>{segmentCampaigns.length}</span>
                           )}
                         </button>
                       ))}
@@ -1042,7 +1164,15 @@ export default function Workspace({
                                   </button>
                                 </td>
                                 <td data-label="Status">
-                                  <Badge value={c.status} />
+                                  <Badge
+                                    value={
+                                      c.deletedAt
+                                        ? "In Trash"
+                                        : c.lifecycle === "closed"
+                                          ? "Closed"
+                                          : c.status
+                                    }
+                                  />
                                 </td>
                                 <td data-label="Precheck">
                                   {!v.analyzed ? (
@@ -1106,18 +1236,26 @@ export default function Workspace({
                       <div className="empty">
                         <Search size={28} />
                         <h3>
-                          {scopedCampaigns.length
+                          {segmentCampaigns.length
                             ? "No campaigns match"
-                            : "No campaigns yet"}
+                            : queueSegment === "trash"
+                              ? "Trash is empty"
+                              : queueSegment === "closed"
+                                ? "No closed reviews"
+                                : "No campaigns yet"}
                         </h3>
                         <p>
-                          {scopedCampaigns.length
+                          {segmentCampaigns.length
                             ? "Try another search or reset your filters."
-                            : role === "reviewer"
-                              ? "Campaigns will appear here when your marketing team creates them."
-                              : "Create your first draft. It stays private to your workspace until you submit it for review."}
+                            : queueSegment === "trash"
+                              ? "Deleted reviews appear here. Their authors and team owners can restore them."
+                              : queueSegment === "closed"
+                                ? "Close a review when it no longer needs active attention. Its history stays available."
+                                : role === "reviewer"
+                                  ? "Campaigns will appear here when your marketing team creates them."
+                                  : "Create your first draft. It stays private to your workspace until you submit it for review."}
                         </p>
-                        {scopedCampaigns.length > 0 && (
+                        {segmentCampaigns.length > 0 && (
                           <Button
                             variant="outline"
                             onClick={() => {
@@ -1132,7 +1270,8 @@ export default function Workspace({
                       </div>
                     )}
                     <div className="table-footer">
-                      {queue.length} campaigns
+                      {queue.length} campaigns ·{" "}
+                      {queueSegment === "trash" ? "in Trash" : queueSegment}
                       <span>
                         Potential issues are guidance, never automatic
                         decisions.
@@ -1407,11 +1546,25 @@ export default function Workspace({
                   <div className="review-heading">
                     <div>
                       <div className="review-kicker">
+                        <GitPullRequest size={15} /> REVIEW ·{" "}
+                        {current.id.slice(0, 8)} <span>/</span>{" "}
                         {current.product} <span>/</span> {current.channel}
                       </div>
                       <h1>{current.title}</h1>
                       <div className="review-meta">
-                        <Badge value={current.status} />
+                        <Badge
+                          value={
+                            current.deletedAt
+                              ? "In Trash"
+                              : current.lifecycle === "closed"
+                                ? "Closed"
+                                : current.status
+                          }
+                        />
+                        {(current.deletedAt ||
+                          current.lifecycle === "closed") && (
+                          <span>Review status: {current.status}</span>
+                        )}
                         <span>Marketing: {current.owner}</span>
                         <span>
                           {historical ? "Current reviewer" : "Reviewer"}:{" "}
@@ -1468,7 +1621,8 @@ export default function Workspace({
                             <ArrowRight size={16} />
                           </Button>
                         ))}
-                      {role === "reviewer" &&
+                      {reviewActive &&
+                        role === "reviewer" &&
                         current.reviewerId === activeUserId &&
                         current.status === "In review" &&
                         !historical && (
@@ -1482,9 +1636,92 @@ export default function Workspace({
                             Record decision
                           </Button>
                         )}
+                      {canManageReview && (
+                        <details className="review-action-menu">
+                          <summary>
+                            <MoreHorizontal size={18} /> Review actions
+                          </summary>
+                          <div>
+                            {current.deletedAt ? (
+                              <button onClick={() => beginLifecycle("restore")}>
+                                <RotateCcw size={15} />
+                                Restore review
+                              </button>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    beginLifecycle(
+                                      current.lifecycle === "closed"
+                                        ? "reopen"
+                                        : "close",
+                                    )
+                                  }
+                                >
+                                  {current.lifecycle === "closed" ? (
+                                    <RotateCcw size={15} />
+                                  ) : (
+                                    <Archive size={15} />
+                                  )}{" "}
+                                  {current.lifecycle === "closed"
+                                    ? "Reopen review"
+                                    : "Close review"}
+                                </button>
+                                <button
+                                  className="danger-action"
+                                  onClick={() => beginLifecycle("delete")}
+                                >
+                                  <Trash2 size={15} />
+                                  Delete review…
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </details>
+                      )}
                     </div>
                   </div>
-                  {!historical &&
+                  <div className="review-context-strip">
+                    <div>
+                      <small>AUTHOR</small>
+                      <strong>{current.owner}</strong>
+                    </div>
+                    <div>
+                      <small>REVIEW REQUESTED FROM</small>
+                      <strong>{current.reviewer || "Not assigned"}</strong>
+                    </div>
+                    <div>
+                      <small>VERSION</small>
+                      <strong>
+                        v{version.number}{" "}
+                        {historical ? "· historical" : "· current"}
+                      </strong>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setDetailTab("Comments");
+                        document
+                          .getElementById("review-discussion")
+                          ?.scrollIntoView({
+                            block: "center",
+                            behavior: "smooth",
+                          });
+                      }}
+                    >
+                      <MessageSquare size={16} /> Conversation{" "}
+                      <span>
+                        {
+                          current.events.filter(
+                            (e) =>
+                              e.versionId === version.id &&
+                              e.action === "comment",
+                          ).length
+                        }
+                      </span>
+                    </button>
+                  </div>
+                  {reviewActive &&
+                    !historical &&
                     ((editable && current.status === "Draft") ||
                       (current.status === "In review" &&
                         (current.ownerId === activeUserId ||
@@ -1569,13 +1806,17 @@ export default function Workspace({
                       </span>
                     </span>
                     <span>
-                      {current.status === "In review"
-                        ? "Locked for human review"
-                        : current.status === "Approved"
-                          ? "Approval applies only to this version"
-                          : editable
-                            ? "Saved versions are immutable"
-                            : "Read-only record"}
+                      {current.deletedAt
+                        ? "This review is in Trash. Its versions and history are preserved; restore it to continue."
+                        : current.lifecycle === "closed"
+                          ? "This review is closed. You can continue the discussion or reopen it without changing its review status."
+                          : current.status === "In review"
+                            ? "Locked for human review"
+                            : current.status === "Approved"
+                              ? "Approval applies only to this version"
+                              : editable
+                                ? "Saved versions are immutable"
+                                : "Read-only record"}
                     </span>
                   </div>
                   {current.events
@@ -1611,7 +1852,7 @@ export default function Workspace({
                         </div>
                       </div>
                     ))}
-                  {current.status === "Changes requested" && (
+                  {reviewActive && current.status === "Changes requested" && (
                     <div className="review-callout">
                       <GitBranch size={17} />
                       <div>
@@ -1627,7 +1868,8 @@ export default function Workspace({
                       </div>
                     </div>
                   )}
-                  {current.status === "In review" &&
+                  {reviewActive &&
+                    current.status === "In review" &&
                     role === "marketer" &&
                     !live && (
                       <div className="demo-next-step">
@@ -1747,20 +1989,25 @@ export default function Workspace({
                         </div>
                       )}
                     </section>
-                    <section className="panel findings-panel">
+                    <section
+                      className="panel findings-panel"
+                      id="review-discussion"
+                    >
                       <div className="detail-tabs">
-                        {["Findings", "Comments", "Activity"].map((t) => (
-                          <button
-                            className={detailTab === t ? "selected" : ""}
-                            key={t}
-                            onClick={() => setDetailTab(t)}
-                          >
-                            {t}
-                            {t === "Findings" && (
-                              <span>{version.findings.length}</span>
-                            )}
-                          </button>
-                        ))}
+                        {["Findings", "Changes", "Comments", "Activity"].map(
+                          (t) => (
+                            <button
+                              className={detailTab === t ? "selected" : ""}
+                              key={t}
+                              onClick={() => setDetailTab(t)}
+                            >
+                              {t}
+                              {t === "Findings" && (
+                                <span>{version.findings.length}</span>
+                              )}
+                            </button>
+                          ),
+                        )}
                       </div>
                       {detailTab === "Findings" && (
                         <>
@@ -1882,6 +2129,12 @@ export default function Workspace({
                             )}
                         </>
                       )}
+                      {detailTab === "Changes" && (
+                        <ReviewChanges
+                          previous={current.versions[viewVersion - 1]}
+                          current={version}
+                        />
+                      )}
                       {detailTab === "Comments" && (
                         <div className="comments">
                           <h3>Conversation on v{version.number}</h3>
@@ -1905,7 +2158,7 @@ export default function Workspace({
                               reviewer.
                             </p>
                           )}
-                          {!historical && (
+                          {!historical && !current.deletedAt && (
                             <>
                               <label>
                                 Add a comment
@@ -2136,6 +2389,20 @@ export default function Workspace({
           )}
         </main>
       </div>
+      {lifecycleAction && current && (
+        <ReviewLifecycleDialog
+          action={lifecycleAction}
+          title={current.title}
+          busy={busy}
+          error={error}
+          unsaved={content !== latest?.content}
+          onClose={() => {
+            setLifecycleAction(null);
+            setError("");
+          }}
+          onConfirm={(reason) => act(lifecycleAction, { note: reason })}
+        />
+      )}
       {preview && current && latest && (
         <Modal labelledBy="edit-title" onClose={() => setPreview(null)}>
           <section className="modal panel" aria-labelledby="edit-title">

@@ -14,7 +14,8 @@ A production-minded marketing compliance review vertical slice for **fictional C
 4. Submit v2. Copy becomes locked. Switch the demo persona to Alex / Reviewer.
 5. Record a decision with a rationale. Inspect the version-specific audit activity.
 6. Switch to Maya and create v3. The campaign returns to Draft; v2 retains its historical approval, which does not apply to v3.
-7. Explore search, product/status filters, policy library and record-derived analytics. A new unchecked draft offers mock timeout/error controls; failures preserve copy.
+7. Use **Review actions** to close, reopen, delete to Trash or restore a review. Open/Closed/Trash is separate from compliance status; see [review lifecycle](docs/REVIEW-LIFECYCLE.md).
+8. Explore search, product/status filters, policy library and record-derived analytics. A new unchecked draft offers mock timeout/error controls; failures preserve copy.
 
 `/login` offers password sign-in and signup. New accounts receive only their own isolated workspace, never the seeded evaluator workspace or reviewer access. Existing memberships remain unchanged. Email addresses are unverified identifiers in this take-home, not proof of business identity; no email/domain/user-editable metadata determines authorization. There are **no shared passwords, anonymous reviewer accounts, client-side role overrides, service-role keys, or auth bypasses**. Human review requires a different team member with the Compliance reviewer role, explicitly assigned to that campaign. The optional email-link path remains for previously invited accounts without passwords. The public sample does not establish authenticated production approval verification.
 

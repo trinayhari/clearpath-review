@@ -48,6 +48,32 @@ export async function readJsonBody(
   }
 }
 const workflowMessages: Record<string, { status: number; message: string }> = {
+  "Review owner or team owner required": {
+    status: 403,
+    message:
+      "Only the review author or team owner can close, delete or restore this review.",
+  },
+  "Review is not in Trash": {
+    status: 409,
+    message: "This review is not in Trash. Refresh to see its current state.",
+  },
+  "Review is in Trash. Restore it first.": {
+    status: 409,
+    message: "Review is in Trash. Restore it first.",
+  },
+  "Review is closed. Reopen it first.": {
+    status: 409,
+    message: "Review is closed. Reopen it first.",
+  },
+  "Review is already closed": {
+    status: 409,
+    message: "Review is already closed.",
+  },
+  "Review is already open": { status: 409, message: "Review is already open." },
+  "Analysis is in progress. Try again when it finishes.": {
+    status: 409,
+    message: "Analysis is in progress. Try again when it finishes.",
+  },
   "Team owner required": {
     status: 403,
     message: "Only the team owner can manage this team or invite people.",

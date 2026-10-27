@@ -61,6 +61,9 @@ export type Campaign = {
   product: (typeof products)[number];
   channel: string;
   status: Status;
+  lifecycle?: "open" | "closed";
+  closedAt?: string;
+  deletedAt?: string;
   owner: string;
   ownerId?: string;
   reviewerId?: string;
@@ -265,6 +268,23 @@ export function assertTransition(
 ) {
   if (c.versions.at(-1)?.id !== versionId)
     throw new Error("This version is stale. Refresh before continuing.");
+  if (["close", "reopen", "delete", "restore"].includes(action)) {
+    if (role !== "marketer")
+      throw new Error("Only the review owner can manage this review.");
+    if (action === "restore") {
+      if (!c.deletedAt) throw new Error("Review is not in Trash");
+      return;
+    }
+    if (c.deletedAt) throw new Error("Review is in Trash. Restore it first.");
+    if (action === "close" && c.lifecycle === "closed")
+      throw new Error("Review is already closed");
+    if (action === "reopen" && c.lifecycle !== "closed")
+      throw new Error("Review is already open");
+    return;
+  }
+  if (c.deletedAt) throw new Error("Review is in Trash. Restore it first.");
+  if (c.lifecycle === "closed" && action !== "comment")
+    throw new Error("Review is closed. Reopen it first.");
   if (action === "comment") return;
   if (["approve", "reject", "request_changes"].includes(action)) {
     if (role !== "reviewer" || c.status !== "In review")

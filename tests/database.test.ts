@@ -445,6 +445,8 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
     await testTrustedRuntime(t, db, connectionString);
     const { testTeams } = await import("./helpers/teams");
     await testTeams(t, db, connectionString);
+    const { testReviewLifecycle } = await import("./helpers/review-lifecycle");
+    await testReviewLifecycle(t, db, connectionString);
   } finally {
     await db.end();
   }

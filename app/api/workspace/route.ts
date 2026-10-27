@@ -19,6 +19,10 @@ const command = z.object({
     "analyze",
     "submit",
     "assign",
+    "close",
+    "reopen",
+    "delete",
+    "restore",
     "comment",
     "approve",
     "reject",
@@ -75,6 +79,9 @@ export async function GET() {
           product: c.product,
           channel: c.channel,
           status: c.status,
+          lifecycle: c.lifecycle ?? "open",
+          closedAt: c.closed_at ?? undefined,
+          deletedAt: c.deleted_at ?? undefined,
           ownerId: c.owner_id,
           reviewerId: c.reviewer_id ?? undefined,
           reviewer: members.find(
@@ -169,6 +176,10 @@ export async function POST(req: NextRequest) {
     )
       input.data = {
         note: z.string().trim().min(3).max(4000).parse(input.data.note),
+      };
+    if (["close", "reopen", "delete", "restore"].includes(input.action))
+      input.data = {
+        note: z.string().trim().max(4000).optional().parse(input.data.note),
       };
     if (input.action === "assign")
       input.data = { reviewerId: z.uuid().parse(input.data.reviewerId) };

@@ -136,10 +136,39 @@ export function demoCommand(
   versionId: string,
   data: Record<string, unknown>,
 ): Campaign {
-  if (action !== "assign") assertTransition(c, role, action, versionId);
+  const lifecycleAction = ["close", "reopen", "delete", "restore"].includes(
+    action,
+  );
+  if (
+    lifecycleAction &&
+    data.actorId &&
+    data.actorId !== c.ownerId &&
+    !data.isTeamOwner
+  )
+    throw new Error(
+      "Only the review owner or team owner can manage this review.",
+    );
+  const transitionRole =
+    lifecycleAction && (data.isTeamOwner || data.actorId === c.ownerId)
+      ? "marketer"
+      : role;
+  if (action !== "assign")
+    assertTransition(c, transitionRole, action, versionId);
+  else if (c.deletedAt || c.lifecycle === "closed")
+    throw new Error("Reopen or restore this review before assigning it.");
   const copy = structuredClone(c),
     at = new Date().toISOString();
   let version = copy.versions.at(-1)!;
+  if (action === "close") {
+    copy.lifecycle = "closed";
+    copy.closedAt = at;
+  }
+  if (action === "reopen") {
+    copy.lifecycle = "open";
+    copy.closedAt = undefined;
+  }
+  if (action === "delete") copy.deletedAt = at;
+  if (action === "restore") copy.deletedAt = undefined;
   if (action === "revise") {
     version = {
       id: crypto.randomUUID(),

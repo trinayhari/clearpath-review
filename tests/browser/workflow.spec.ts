@@ -85,7 +85,7 @@ test("queue filters, policy library, analytics, mobile layout and auth denial", 
     .getByRole("button", { name: "Policy library", exact: true })
     .click();
   await expect(
-    page.getByText("Fictional policies for demonstration"),
+    page.getByText("Review guidelines"),
   ).toBeVisible();
   await page.getByRole("button", { name: "Analytics", exact: true }).click();
   await expect(

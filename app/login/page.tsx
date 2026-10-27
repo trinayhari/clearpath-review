@@ -127,11 +127,14 @@ export default function Login() {
                     }
                     minLength={method === "signup" ? 12 : 8}
                     maxLength={200}
+                    aria-describedby={
+                      method === "signup" ? "signup-guidance" : undefined
+                    }
                   />
                 </>
               )}
               {method === "signup" && (
-                <p className="signup-note">
+                <p id="signup-guidance" className="signup-note">
                   Use at least 12 characters. Email ownership is not verified in
                   this take-home. Signup creates marketer access only to your
                   own workspace; it does not grant access to an existing team or

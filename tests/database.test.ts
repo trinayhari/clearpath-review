@@ -415,8 +415,8 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
         );
         await db.query("reset role");
         await db.query(
-          "update cp_campaigns set status='In review' where id=$1",
-          [legacyId],
+          "update cp_campaigns set status='In review', reviewer_id=$2 where id=$1",
+          [legacyId, uid(11)],
         );
         await as(11);
         await assert.rejects(
@@ -443,6 +443,8 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
     const { testTrustedRuntime } = await import("./helpers/trusted-runtime");
     await db.query("reset role");
     await testTrustedRuntime(t, db, connectionString);
+    const { testTeams } = await import("./helpers/teams");
+    await testTeams(t, db, connectionString);
   } finally {
     await db.end();
   }

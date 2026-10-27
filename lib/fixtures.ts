@@ -76,6 +76,11 @@ export async function seedCampaigns(): Promise<Campaign[]> {
         channel,
         status,
         owner: "Maya Chen",
+        ownerId: "demo-maya",
+        workspaceId: "demo-team",
+        ...(status !== "Draft"
+          ? { reviewerId: "demo-alex", reviewer: "Alex Morgan" }
+          : {}),
         versions: [
           {
             id: vid,
@@ -131,7 +136,7 @@ export function demoCommand(
   versionId: string,
   data: Record<string, unknown>,
 ): Campaign {
-  assertTransition(c, role, action, versionId);
+  if (action !== "assign") assertTransition(c, role, action, versionId);
   const copy = structuredClone(c),
     at = new Date().toISOString();
   let version = copy.versions.at(-1)!;
@@ -153,6 +158,12 @@ export function demoCommand(
     version.findings = data.findings as typeof version.findings;
     version.analyzed = true;
   }
+  if (action === "assign") {
+    if (role !== "marketer" || copy.status !== "In review")
+      throw new Error("Only the campaign owner can assign this review.");
+    copy.reviewerId = String(data.reviewerId);
+    copy.reviewer = String(data.reviewer);
+  }
   if (action === "submit") {
     if (
       copy.events.some(
@@ -162,6 +173,8 @@ export function demoCommand(
       )
     )
       throw new Error("Save a revised version before resubmitting.");
+    copy.reviewerId = String(data.reviewerId || "demo-alex");
+    copy.reviewer = String(data.reviewer || "Alex Morgan");
     copy.status = "In review";
     copy.submittedAt = at;
   }
@@ -178,7 +191,9 @@ export function demoCommand(
   }
   copy.events.push({
     id: crypto.randomUUID(),
-    actor: role === "marketer" ? "Maya Chen" : "Alex Morgan",
+    actor: String(
+      data.actor || (role === "marketer" ? "Maya Chen" : "Alex Morgan"),
+    ),
     action,
     versionId: version.id,
     at,

@@ -189,10 +189,10 @@ export default function Login() {
           <details className="access-help">
             <summary>Joining your team for the first time?</summary>
             <p>
-              Create an account to start your own isolated workspace. To join an
-              existing team, its owner must authorize your individual account
-              separately. Signing in alone does not grant access to a team’s
-              campaigns.
+              Create an account to start your own team. To join an existing
+              team, ask its owner for an invitation code, then open Team &
+              people after signing in. Signing in alone does not grant access to
+              a team’s campaigns.
             </p>
             <p>
               New accounts can draft campaigns and run mock prechecks. Human

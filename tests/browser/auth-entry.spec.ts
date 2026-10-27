@@ -147,13 +147,19 @@ test("default invite fragments are scrubbed and require explicit verified-accoun
 
 test("account settings reject signed-out access and password writes", async ({
   page,
-  request,
 }) => {
   await page.goto("/account");
   await expect(page).toHaveURL(/\/login/);
-  const response = await request.post("/api/auth", {
-    headers: { Origin: new URL(page.url()).origin },
-    data: { action: "set_password", password: "synthetic-test-password" },
+  const status = await page.evaluate(async () => {
+    const response = await fetch("/api/auth", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "set_password",
+        password: "synthetic-test-password",
+      }),
+    });
+    return response.status;
   });
-  expect(response.status()).toBe(401);
+  expect(status).toBe(401);
 });

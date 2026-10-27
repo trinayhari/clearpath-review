@@ -4,22 +4,22 @@ This is a tested vertical slice for fictional financial marketing reviews, not a
 
 | Area | Status | Evidence / remaining work |
 |---|---|---|
-| Production build and types | Passed | Next.js production build, TypeScript check, 66 local automated domain/database/provider/HTTP tests |
+| Production build and types | Passed | Next.js production build, TypeScript check, 67 local automated domain/database/provider/HTTP tests |
 | Authentication entry | Passed, limited | Root gates on validated `getUser`; signed-out production browser redirects to login; no fixture fallback |
-| Actual invited-account sign-in and session refresh | Partially verified | Both approved invitations, roles, refresh and sign-out confirmed by parent browser; returning email hit quota. Password signup is now primary; actual new signup awaits user-entered credentials |
-| Workspace isolation and roles | Passed locally; hosted negative checks passed previously | Real PostgreSQL RLS/grants; cross-workspace and same-workspace non-owner mutations rejected; no metadata-based roles |
-| Two-person hosted persisted workflow | Partially verified | Actual marketer creation/precheck/submission and reviewer request-changes persisted; revision/approval/relogin still pending |
+| Actual signup/login and session refresh | Passed for approved QA identities | Real password signup, refresh, logout and password relogin passed for two isolated QA users; earlier invitation delivery also verified, email-link quota remains a limitation |
+| Workspace isolation and roles | Passed locally and in actual QA requests | Real PostgreSQL RLS/grants; cross-workspace and same-workspace non-owner mutations rejected; no metadata-based roles |
+| Two-account hosted persisted workflow | Passed | Actual v1 submission/request-changes, v2 revision/recheck/approval, v3 unapproved draft; nine audit events and both accounts’ relogin persistence verified. Automated QA identities, not independent humans |
 | Exact-version and concurrent decisions | Passed locally | Stale decision rejected; concurrent approvals yield one event; new revision resets current approval and retains historical event |
 | Self-approval | Passed locally | Even changing an author's membership to reviewer cannot authorize their own campaign |
 | Immutable audit and analysis | Passed locally | Direct app writes revoked; immutable triggers; caller-supplied mock findings rejected |
 | Safe operational errors | Passed | Fixed message catalogue; raw database errors not returned; stale/concurrent actions classified; uncertain results require refresh |
 | Input/output bounds | Passed | Streamed request-body limit, content/note schemas, response size/finding limits and full output validation |
-| Browser workflow/accessibility | Passed, bounded | Nine local and production scenarios at deployed 7de0bfa; independent desktop/mobile review; focus trapping and policy return; not full WCAG certification |
+| Browser workflow/accessibility | Passed, bounded | Eleven deployed regression scenarios at 09c25fa plus actual authenticated QA loop; independent desktop/mobile review; focus trapping and policy return; not full WCAG certification |
 | Mock assessment trust | Passed | Database computes from stored version; provenance required; no AI approval |
 | External provider parsing/failure handling | Passed with synthetic transport | Schema, excerpts, applicability, refusal, incomplete response, timeout and rate-limit paths |
-| Actual paid provider validation | Blocked | One-off two-request Vercel build was rejected by automatic approval review; zero calls executed from this attempt |
-| Provider persistence and provenance | Not enabled | Reservation/claim/finalizer implemented and tested locally; hosted migration/credential approval pending; ordinary user RPC cannot persist external findings |
-| Cost controls | Disabled live surface; bounded test prepared | No application route can spend. Local runtime uses database-owned cumulative $2 global ceiling, $0.20 reservation/attempt, durable quotas and no refunds/retries; production inactive |
+| Actual paid provider validation | Pending controlled activation | New authenticated runtime test explicitly approved within cumulative $2 cap; no paid request yet. The earlier rejected build-side test is retired, not retried |
+| Provider persistence and provenance | Hosted, disabled pending validation | Reviewed migration applied; signing key/config securely provisioned disabled by parent; ordinary user RPC cannot forge external findings |
+| Cost controls | Hosted, disabled pending validation | Database-owned cumulative $2 global ceiling, $0.20 permanent reservation/attempt, durable quotas and no refunds/retries. Exact QA workspace also gated in server/UI; arbitrary signups remain mock |
 | Auth rate limiting | Platform-managed; operational verification pending | Uses Supabase Auth limits; 429 handled. Do not claim a tested distributed custom rate limiter |
 | Campaign API abuse controls | Partial | Auth/RLS, bounded inputs, per-version immutable assessment and locked workflow; distributed user/IP quotas are not implemented |
 | Durable starting campaigns | Prepared, not executed | User-scoped seed script requires approved marketer session and workspace; never invents reviewer decisions |

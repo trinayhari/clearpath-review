@@ -419,7 +419,7 @@ export default function Workspace({
             : action === "analyze"
               ? live && analysisMode === "openai"
                 ? "OpenAI precheck complete. Human review is still required."
-                : "Mock precheck complete. Human review is still required."
+                : "Precheck complete. Human review is still required."
               : action === "submit"
                 ? "Version submitted. Content is now locked for human review."
                 : action === "assign"
@@ -664,7 +664,7 @@ export default function Workspace({
             {!live && (
               <span className="mock-label">
                 <Sparkles size={13} />
-                Mock AI
+                Preview
               </span>
             )}
             {live ? (
@@ -697,7 +697,7 @@ export default function Workspace({
             <span className="demo-dot" />
             {live
               ? `${workspaces.find((w) => w.id === workspaceId)?.name || "Workspace"} · ${role === "marketer" ? "Marketing" : "Compliance reviewer"}`
-              : "Interactive demo · Fictional data · Changes stay in this tab"}
+              : "Preview workspace · Changes stay in this tab"}
           </span>
           {workspaces.length > 1 && (
             <label>
@@ -747,7 +747,7 @@ export default function Workspace({
             <label>
               Explore as{" "}
               <select
-                aria-label="Demo role"
+                aria-label="Preview role"
                 value={
                   role === "marketer"
                     ? "marketer"
@@ -1502,7 +1502,7 @@ export default function Workspace({
                           <strong>
                             {live && analysisMode === "openai"
                               ? "Run an AI precheck"
-                              : "Run a mock precheck"}
+                              : "Run a precheck"}
                           </strong>
                           <span>
                             Review policy matches and uncertain claims.
@@ -1515,8 +1515,8 @@ export default function Workspace({
                       </ol>
                       <small>
                         {live && analysisMode === "openai"
-                          ? "Running precheck sends this campaign copy to OpenAI for analysis. Only submit authorized fictional test content during validation."
-                          : "Mock analysis is deterministic. No content is sent to an external AI provider."}
+                          ? "Running precheck sends this campaign copy to OpenAI for analysis."
+                          : "Precheck flags potential policy issues for your reviewer."}
                       </small>
                     </aside>
                   </div>
@@ -1881,7 +1881,7 @@ export default function Workspace({
                             {current.reviewer || "your assigned reviewer"} ·
                             Reviewer
                           </strong>{" "}
-                          above to continue the demo.
+                          above to continue the review.
                         </span>
                       </div>
                     )}
@@ -2016,9 +2016,7 @@ export default function Workspace({
                               <Sparkles size={13} />
                               {version.assessmentProvider === "openai"
                                 ? `OpenAI analysis · ${version.analysisModel}`
-                                : live
-                                  ? "Mock precheck · deterministic rules"
-                                  : "Mock analysis · demonstration only"}
+                                : "Rules-based precheck"}
                             </span>
                             <p>
                               {version.analyzed
@@ -2241,7 +2239,7 @@ export default function Workspace({
                   <div className="policy-disclaimer">
                     <BookOpen size={20} />
                     <div>
-                      <strong>Fictional policies for demonstration</strong>
+                      <strong>Review guidelines</strong>
                       <p>
                         These are sample internal requirements, not legal advice
                         or a representation of current regulations.
@@ -2379,7 +2377,7 @@ export default function Workspace({
                     </section>
                   </div>
                   <p className="subtle-footer">
-                    {live ? "Workspace records" : "Fictional demo records"} ·
+                    {live ? "Workspace records" : "Preview records"} ·
                     Metrics update as you work. Turnaround excludes drafts and
                     undecided submissions.
                   </p>
@@ -2499,7 +2497,7 @@ export default function Workspace({
               Recorded as{" "}
               {live
                 ? "your authenticated reviewer identity"
-                : `${memberships.find((m) => m.user_id === previewReviewerId && m.workspace_id === workspaceId)?.display_name || "Sample reviewer"} (isolated demo)`}
+                : `${memberships.find((m) => m.user_id === previewReviewerId && m.workspace_id === workspaceId)?.display_name || "Sample reviewer"} (preview)`}
               . This decision applies only to version {latest.number}.
             </p>
             <div className="form-actions">

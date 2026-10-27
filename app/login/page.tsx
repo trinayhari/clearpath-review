@@ -195,7 +195,7 @@ export default function Login() {
               a team’s campaigns.
             </p>
             <p>
-              New accounts can draft campaigns and run mock prechecks. Human
+              New accounts can draft campaigns and run prechecks. Human
               decisions require a separately authorized reviewer. Existing
               invited accounts keep their assigned role; signup cannot reset an
               existing account’s password.

@@ -87,9 +87,9 @@ test("reviewers cannot close or delete another author’s review and mobile acti
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await openReview(page);
-  await page.getByLabel("Demo role").selectOption("reviewer");
+  await page.getByLabel("Preview role").selectOption("reviewer");
   await expect(page.locator(".review-action-menu")).toHaveCount(0);
-  await page.getByLabel("Demo role").selectOption("marketer");
+  await page.getByLabel("Preview role").selectOption("marketer");
   await page.locator(".review-action-menu summary").click();
   await expect(
     page.getByRole("button", { name: "Delete review…", exact: true }),

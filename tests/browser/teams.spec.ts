@@ -80,12 +80,12 @@ test("named reviewer receives the submission and only their sample persona sees 
   await expect(
     page.getByText("Reviewer: Jordan Lee", { exact: true }),
   ).toBeVisible();
-  await page.getByLabel("Demo role").selectOption("reviewer");
+  await page.getByLabel("Preview role").selectOption("reviewer");
   await expect(
     page.getByRole("button", { name: "Record decision", exact: true }),
   ).toHaveCount(0);
   await page
-    .getByLabel("Demo role")
+    .getByLabel("Preview role")
     .selectOption({ label: "Jordan Lee · Reviewer" });
   await page
     .getByRole("button", { name: "Record decision", exact: true })

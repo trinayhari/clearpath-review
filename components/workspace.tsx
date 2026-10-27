@@ -126,6 +126,7 @@ export default function Workspace({
   const [lifecycleAction, setLifecycleAction] =
     useState<LifecycleAction | null>(null);
   const [reviewerChoice, setReviewerChoice] = useState("");
+  const [reviewerPickerOpen, setReviewerPickerOpen] = useState(false);
   const [previewReviewerId, setPreviewReviewerId] = useState("demo-alex");
   const [workspaces, setWorkspaces] = useState<
     {
@@ -145,8 +146,6 @@ export default function Workspace({
           },
         ],
   );
-  const [clock, setClock] = useState<number | null>(null);
-  useEffect(() => setClock(Date.now()), []);
   const [campaigns, setCampaigns] = useState(initial),
     [tab, setTab] = useState<Tab>("queue"),
     [selected, setSelected] = useState<string | null>(null),
@@ -158,6 +157,7 @@ export default function Workspace({
     [userId, setUserId] = useState(mode === "live" ? "" : "demo-maya"),
     [search, setSearch] = useState(""),
     [filter, setFilter] = useState("All work"),
+    [statusFilter, setStatusFilter] = useState("All statuses"),
     [productFilter, setProductFilter] = useState("All products"),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -170,6 +170,11 @@ export default function Workspace({
     [decision, setDecision] = useState<string | null>(null),
     [highlight, setHighlight] = useState(""),
     [failure, setFailure] = useState<"normal" | "timeout" | "error">("normal");
+  useEffect(() => {
+    setStatusFilter("All statuses");
+    setProductFilter("All products");
+    setSearch("");
+  }, [workspaceId]);
   useEffect(() => {
     if (tab === "policies" && policyContext) {
       const rule = document.getElementById(policyContext);
@@ -268,7 +273,7 @@ export default function Workspace({
       email: data.email || "",
     });
     if (!data.workspaces.some((w: { id: string }) => w.id === workspaceId))
-      setFilter(member?.role === "reviewer" ? "In review" : "My work");
+      setFilter(member?.role === "reviewer" ? "Assigned to me" : "My work");
     const requested = new URLSearchParams(location.search).get("campaign");
     const requestedCampaign = (data.campaigns as Campaign[]).find(
       (c) => c.id === requested,
@@ -338,6 +343,7 @@ export default function Workspace({
       );
     setSelected(c.id);
     setReviewerChoice(c.reviewerId || "");
+    setReviewerPickerOpen(false);
     setTab("review");
     setViewVersion(c.versions.length - 1);
     setContent(
@@ -438,6 +444,7 @@ export default function Workspace({
       setPreview(null);
       setDecision(null);
       setLifecycleAction(null);
+      if (action === "assign") setReviewerPickerOpen(false);
       if (["delete", "restore", "close", "reopen"].includes(action)) {
         setQueueSegment(
           action === "delete"
@@ -474,6 +481,15 @@ export default function Workspace({
     (current.ownerId === activeUserId ||
       workspaces.find((w) => w.id === workspaceId)?.owner_id === activeUserId),
   );
+  const canAssignReviewer = Boolean(
+    reviewActive &&
+    !historical &&
+    ((editable && current?.status === "Draft") ||
+      (current?.status === "In review" &&
+        (current.ownerId === activeUserId ||
+          workspaces.find((w) => w.id === workspaceId)?.owner_id ===
+            activeUserId))),
+  );
   const teamCampaigns = campaigns.filter(
     (c) => (c.workspaceId || "demo-team") === workspaceId,
   );
@@ -483,20 +499,6 @@ export default function Workspace({
       ? Boolean(c.deletedAt)
       : !c.deletedAt && (c.lifecycle || "open") === queueSegment,
   );
-  const nextAction = (c: Campaign) =>
-    c.deletedAt
-      ? "In Trash · restore to continue"
-      : c.lifecycle === "closed"
-        ? "Closed · discussion preserved"
-        : c.status === "In review"
-          ? `${c.reviewer || "Unassigned reviewer"}: review v${c.versions.at(-1)!.number}`
-          : c.status === "Approved"
-            ? `Approved v${c.versions.at(-1)!.number} · ready to use`
-            : c.status === "Changes requested"
-              ? `${c.owner}: revise the copy`
-              : c.status === "Rejected"
-                ? `${c.owner}: review the rationale`
-                : `${c.owner}: ${c.versions.at(-1)!.analyzed ? "choose reviewer & submit" : "prepare & precheck"}`;
   const queue = segmentCampaigns
     .filter(
       (c) =>
@@ -504,8 +506,8 @@ export default function Workspace({
           (filter === "My work" && c.ownerId === activeUserId) ||
           (filter === "Assigned to me" &&
             c.reviewerId === activeUserId &&
-            c.status === "In review") ||
-          c.status === filter) &&
+            c.status === "In review")) &&
+        (statusFilter === "All statuses" || c.status === statusFilter) &&
         (productFilter === "All products" || c.product === productFilter) &&
         `${c.title} ${c.owner} ${c.reviewer || ""} ${c.product}`
           .toLowerCase()
@@ -553,11 +555,58 @@ export default function Workspace({
         <div className="workspace-switch">
           <span className="company-icon">C</span>
           <div>
-            {live
-              ? workspaces.find((w) => w.id === workspaceId)?.name ||
-                "Your workspace"
-              : workspaces.find((w) => w.id === workspaceId)?.name ||
-                "Sample team"}
+            {workspaces.length > 1 ? (
+              <label>
+                <select
+                  aria-label="Active workspace"
+                  value={workspaceId}
+                  onChange={(e) => {
+                    const nextMember = memberships.find(
+                      (m) =>
+                        m.user_id === userId &&
+                        m.workspace_id === e.target.value,
+                    );
+                    setIdentity((previous) => ({
+                      ...previous,
+                      name:
+                        nextMember?.display_name ||
+                        previous.email ||
+                        "Your account",
+                    }));
+                    setFilter(
+                      nextMember?.role === "reviewer"
+                        ? "Assigned to me"
+                        : "My work",
+                    );
+                    setWorkspaceId(e.target.value);
+                    setStatusFilter("All statuses");
+                    setAnalysisMode(
+                      workspaces.find((w) => w.id === e.target.value)
+                        ?.analysisMode === "openai"
+                        ? "openai"
+                        : "mock",
+                    );
+                    setRole(
+                      roleForWorkspace(memberships, userId, e.target.value) ??
+                        "marketer",
+                    );
+                    showQueue();
+                    setSelected(null);
+                  }}
+                >
+                  {workspaces.map((w) => (
+                    <option value={w.id} key={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <strong>
+                {workspaces.find((w) => w.id === workspaceId)?.name ||
+                  "Your workspace"}
+              </strong>
+            )}
             <small>
               {live ? "Marketing & compliance" : "Sample workspace"}
             </small>
@@ -575,6 +624,12 @@ export default function Workspace({
           ).map(({ id, label, Icon }) => (
             <button
               key={id}
+              aria-current={
+                tab === id ||
+                (id === "queue" && ["new", "review"].includes(tab))
+                  ? "page"
+                  : undefined
+              }
               className={`nav-item ${tab === id || (id === "queue" && ["new", "review"].includes(tab)) ? "active" : ""}`}
               onClick={() => {
                 setPolicyContext(null);
@@ -596,13 +651,6 @@ export default function Workspace({
               Account &amp; sign-in
             </a>
           )}
-          <div className="safe-note">
-            <ShieldCheck size={19} />
-            <strong>Human judgment, always.</strong>
-            <p>
-              Prechecks surface potential issues. People make every decision.
-            </p>
-          </div>
           <div className="profile">
             <span className="avatar">
               {live
@@ -667,6 +715,11 @@ export default function Workspace({
                 Preview
               </span>
             )}
+            {live && (
+              <Link className="mobile-account" href="/account">
+                Account
+              </Link>
+            )}
             {live ? (
               <Button
                 variant="ghost"
@@ -692,97 +745,57 @@ export default function Workspace({
             )}
           </div>
         </header>
-        <div className={live ? "workspace-context" : "demo-strip"}>
-          <span>
-            <span className="demo-dot" />
-            {live
-              ? `${workspaces.find((w) => w.id === workspaceId)?.name || "Workspace"} · ${role === "marketer" ? "Marketing" : "Compliance reviewer"}`
-              : "Preview workspace · Changes stay in this tab"}
-          </span>
-          {workspaces.length > 1 && (
-            <label>
-              Workspace{" "}
-              <select
-                aria-label="Active workspace"
-                value={workspaceId}
-                onChange={(e) => {
-                  const nextMember = memberships.find(
-                    (m) =>
-                      m.user_id === userId && m.workspace_id === e.target.value,
-                  );
-                  setIdentity((previous) => ({
-                    ...previous,
-                    name:
-                      nextMember?.display_name ||
-                      previous.email ||
-                      "Your account",
-                  }));
-                  setFilter(
-                    nextMember?.role === "reviewer" ? "In review" : "My work",
-                  );
-                  setWorkspaceId(e.target.value);
-                  setAnalysisMode(
-                    workspaces.find((w) => w.id === e.target.value)
-                      ?.analysisMode === "openai"
-                      ? "openai"
-                      : "mock",
-                  );
-                  setRole(
-                    roleForWorkspace(memberships, userId, e.target.value) ??
-                      "marketer",
-                  );
-                  showQueue();
-                  setSelected(null);
-                }}
-              >
-                {workspaces.map((w) => (
-                  <option value={w.id} key={w.id}>
-                    {w.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {!live && (
-            <label>
-              Explore as{" "}
-              <select
-                aria-label="Preview role"
-                value={
-                  role === "marketer"
-                    ? "marketer"
-                    : previewReviewerId === "demo-alex"
-                      ? "reviewer"
-                      : previewReviewerId
-                }
-                onChange={(e) => {
-                  setRole(
-                    e.target.value === "marketer" ? "marketer" : "reviewer",
-                  );
-                  if (e.target.value !== "marketer")
-                    setPreviewReviewerId(
-                      e.target.value === "reviewer"
-                        ? "demo-alex"
-                        : e.target.value,
+        {!live && (
+          <div className="demo-strip">
+            <span>
+              <span className="demo-dot" />
+              {live
+                ? `${workspaces.find((w) => w.id === workspaceId)?.name || "Workspace"} · ${role === "marketer" ? "Marketing" : "Compliance reviewer"}`
+                : "Preview workspace · Changes stay in this tab"}
+            </span>
+            {!live && (
+              <label>
+                Explore as{" "}
+                <select
+                  aria-label="Preview role"
+                  value={
+                    role === "marketer"
+                      ? "marketer"
+                      : previewReviewerId === "demo-alex"
+                        ? "reviewer"
+                        : previewReviewerId
+                  }
+                  onChange={(e) => {
+                    setRole(
+                      e.target.value === "marketer" ? "marketer" : "reviewer",
                     );
-                  setFilter("All work");
-                }}
-              >
-                <option value="marketer">Maya · Marketer</option>
-                {teamMembers
-                  .filter((m) => m.role === "reviewer")
-                  .map((m) => (
-                    <option
-                      key={m.user_id}
-                      value={m.user_id === "demo-alex" ? "reviewer" : m.user_id}
-                    >
-                      {m.display_name} · Reviewer
-                    </option>
-                  ))}
-              </select>
-            </label>
-          )}
-        </div>
+                    if (e.target.value !== "marketer")
+                      setPreviewReviewerId(
+                        e.target.value === "reviewer"
+                          ? "demo-alex"
+                          : e.target.value,
+                      );
+                    setFilter("All work");
+                  }}
+                >
+                  <option value="marketer">Maya · Marketer</option>
+                  {teamMembers
+                    .filter((m) => m.role === "reviewer")
+                    .map((m) => (
+                      <option
+                        key={m.user_id}
+                        value={
+                          m.user_id === "demo-alex" ? "reviewer" : m.user_id
+                        }
+                      >
+                        {m.display_name} · Reviewer
+                      </option>
+                    ))}
+                </select>
+              </label>
+            )}
+          </div>
+        )}
         <main>
           {live && loadState === "loading" ? (
             <section
@@ -923,22 +936,12 @@ export default function Workspace({
               {tab === "queue" && (
                 <>
                   <div className="page-heading">
-                    <div className="eyebrow">MARKETING × COMPLIANCE</div>
                     <div className="heading-row">
                       <div>
-                        <h1>
-                          {live
-                            ? role === "reviewer"
-                              ? "Awaiting your review"
-                              : "Your campaigns"
-                            : "Review queue"}
-                        </h1>
+                        <h1>Review queue</h1>
                         <p>
-                          {live
-                            ? role === "reviewer"
-                              ? "Review the submitted copy, discuss changes, and record a version-specific decision."
-                              : "Your copy. Your reviewer. Every decision on record."
-                            : "A shared workspace for copy, feedback and decisions."}
+                          Manage campaigns, review feedback, and track
+                          decisions.
                         </p>
                       </div>
                       {role === "marketer" && (
@@ -955,35 +958,6 @@ export default function Workspace({
                       )}
                     </div>
                   </div>
-                  <details className="workflow-help">
-                    <summary>
-                      How a review works <ArrowRight size={14} />
-                    </summary>
-                    <div
-                      className="handoff-guide"
-                      aria-label="How reviews work"
-                    >
-                      <div>
-                        <span>1</span>
-                        <strong>Marketing prepares</strong>
-                        <p>Create a draft and run precheck.</p>
-                      </div>
-                      <div>
-                        <span>2</span>
-                        <strong>Choose a reviewer</strong>
-                        <p>Submit a locked version to a named teammate.</p>
-                      </div>
-                      <div>
-                        <span>3</span>
-                        <strong>Compliance decides</strong>
-                        <p>Approve, request changes or reject with a reason.</p>
-                      </div>
-                      <Button variant="outline" onClick={() => setTab("team")}>
-                        <Users size={16} />
-                        Manage team
-                      </Button>
-                    </div>
-                  </details>
                   {teamMembers.length > 0 &&
                     !teamMembers.some((m) => m.role === "reviewer") && (
                       <div className="workflow-next">
@@ -995,35 +969,28 @@ export default function Workspace({
                         </button>
                       </div>
                     )}
-                  <div className="stats-row">
-                    <div className="stat">
-                      <span>
-                        Awaiting review <Clock3 size={16} />
-                      </span>
-                      <strong>
-                        {inReview}
-                        <small>ready for a human decision</small>
-                      </strong>
+                  {teamCampaigns.length > 0 && (
+                    <div className="stats-row queue-summary">
+                      <div className="stat">
+                        <span>
+                          Awaiting review <Clock3 size={16} />
+                        </span>
+                        <strong>{inReview}</strong>
+                      </div>
+                      <div className="stat">
+                        <span>
+                          Changes requested <GitBranch size={16} />
+                        </span>
+                        <strong>{changes}</strong>
+                      </div>
+                      <div className="stat">
+                        <span>
+                          Approved <CheckCircle2 size={16} />
+                        </span>
+                        <strong>{approved}</strong>
+                      </div>
                     </div>
-                    <div className="stat">
-                      <span>
-                        Changes requested <GitBranch size={16} />
-                      </span>
-                      <strong>
-                        {changes}
-                        <small>waiting on a revised draft</small>
-                      </strong>
-                    </div>
-                    <div className="stat">
-                      <span>
-                        Approved <CheckCircle2 size={16} />
-                      </span>
-                      <strong>
-                        {approved}
-                        <small>exact versions signed off</small>
-                      </strong>
-                    </div>
-                  </div>
+                  )}
                   <div className="panel queue-panel">
                     <div
                       className="lifecycle-tabs"
@@ -1042,6 +1009,7 @@ export default function Workspace({
                           aria-pressed={queueSegment === id}
                           onClick={() => {
                             setQueueSegment(id);
+                            setStatusFilter("All statuses");
                             setFilter("All work");
                             setSearch("");
                           }}
@@ -1068,170 +1036,176 @@ export default function Workspace({
                             : "Active drafts and reviews"}
                       </span>
                     </div>
-                    <div className="queue-tabs">
-                      {[
-                        ...(role === "marketer"
-                          ? ["My work"]
-                          : ["Assigned to me"]),
-                        "All work",
-                        "In review",
-                        "Changes requested",
-                        "Draft",
-                        "Approved",
-                        "Rejected",
-                      ].map((s) => (
-                        <button
-                          className={filter === s ? "selected" : ""}
-                          key={s}
-                          onClick={() => setFilter(s)}
-                        >
-                          {s === "In review" ? "Awaiting review" : s}
-                          {s === "All work" && (
-                            <span>{segmentCampaigns.length}</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="filters">
-                      <div className="search-box">
-                        <Search size={17} />
-                        <input
-                          aria-label="Search campaigns"
-                          placeholder="Search campaigns, owners, or products…"
-                          value={search}
-                          onChange={(e) => setSearch(e.target.value)}
-                        />
-                        {search && (
-                          <button
-                            onClick={() => setSearch("")}
-                            aria-label="Clear search"
-                          >
-                            <X size={14} />
-                          </button>
-                        )}
-                      </div>
-                      <select
-                        aria-label="Filter product"
-                        value={productFilter}
-                        onChange={(e) => setProductFilter(e.target.value)}
+                    <div className="queue-toolbar">
+                      <div
+                        className="queue-ownership"
+                        aria-label="Campaign ownership"
                       >
-                        <option>All products</option>
-                        {products.map((p) => (
-                          <option key={p}>{p}</option>
+                        {[
+                          "All work",
+                          role === "marketer" ? "My work" : "Assigned to me",
+                        ].map((scope) => (
+                          <button
+                            key={scope}
+                            className={filter === scope ? "selected" : ""}
+                            aria-pressed={filter === scope}
+                            onClick={() => setFilter(scope)}
+                          >
+                            {scope}
+                          </button>
                         ))}
-                      </select>
+                      </div>
+                      <div className="queue-filters">
+                        <div className="search-box">
+                          <Search size={16} />
+                          <input
+                            aria-label="Search campaigns"
+                            placeholder="Search campaigns…"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                          />
+                          {search && (
+                            <button
+                              onClick={() => setSearch("")}
+                              aria-label="Clear search"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                        <select
+                          aria-label="Filter status"
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value)}
+                        >
+                          <option>All statuses</option>
+                          {statuses.map((status) => (
+                            <option key={status}>{status}</option>
+                          ))}
+                        </select>
+                        <select
+                          aria-label="Filter product"
+                          value={productFilter}
+                          onChange={(e) => setProductFilter(e.target.value)}
+                        >
+                          <option>All products</option>
+                          {products.map((product) => (
+                            <option key={product}>{product}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                    <div className="table-scroll">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Campaign</th>
-                            <th>Status</th>
-                            <th>Precheck risk</th>
-                            <th>People &amp; next action</th>
-                            <th>Review age</th>
-                            <th />
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {queue.map((c) => {
-                            const v = c.versions.at(-1)!;
-                            const high = v.findings.filter(
-                              (f) => f.severity === "High",
-                            ).length;
-                            return (
-                              <tr key={c.id} onClick={() => open(c)}>
-                                <td>
-                                  <button
-                                    className="campaign-link"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      open(c);
-                                    }}
+                    {queue.length > 0 && (
+                      <div className="table-scroll">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Campaign</th>
+                              <th>Status</th>
+                              <th>Precheck</th>
+                              <th>Author</th>
+                              <th>Reviewer</th>
+                              <th>Updated</th>
+                              <th />
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {queue.map((c) => {
+                              const v = c.versions.at(-1)!;
+                              const high = v.findings.filter(
+                                (f) => f.severity === "High",
+                              ).length;
+                              return (
+                                <tr key={c.id} onClick={() => open(c)}>
+                                  <td>
+                                    <button
+                                      className="campaign-link"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        open(c);
+                                      }}
+                                    >
+                                      <span className="file-icon">
+                                        <FileText size={18} />
+                                      </span>
+                                      <span>
+                                        <strong>{c.title}</strong>
+                                        <small>
+                                          {c.product}
+                                          <span>·</span>
+                                          {c.channel}
+                                          <span>·</span>v{v.number}
+                                        </small>
+                                      </span>
+                                    </button>
+                                  </td>
+                                  <td data-label="Status">
+                                    <Badge
+                                      value={
+                                        c.deletedAt
+                                          ? "In Trash"
+                                          : c.lifecycle === "closed"
+                                            ? "Closed"
+                                            : c.status
+                                      }
+                                    />
+                                  </td>
+                                  <td data-label="Precheck">
+                                    {!v.analyzed ? (
+                                      <span className="muted">Not checked</span>
+                                    ) : high ? (
+                                      <span className="risk-high">
+                                        {high} high priority
+                                      </span>
+                                    ) : v.findings.length ? (
+                                      <span className="risk-medium">
+                                        {v.findings.length} to verify
+                                      </span>
+                                    ) : (
+                                      <span className="muted">
+                                        <Check size={14} />
+                                        No flags
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td
+                                    className="person-cell"
+                                    data-label="Author"
                                   >
-                                    <span className="file-icon">
-                                      <FileText size={18} />
+                                    <span className="person-name">
+                                      {c.owner}
                                     </span>
-                                    <span>
-                                      <strong>{c.title}</strong>
-                                      <small>
-                                        {c.product}
-                                        <span>·</span>
-                                        {c.channel}
-                                        <span>·</span>v{v.number}
-                                      </small>
+                                  </td>
+                                  <td
+                                    className="person-cell"
+                                    data-label="Reviewer"
+                                  >
+                                    <span
+                                      className={
+                                        c.reviewer ? "person-name" : "muted"
+                                      }
+                                    >
+                                      {c.reviewer || "Unassigned"}
                                     </span>
-                                  </button>
-                                </td>
-                                <td data-label="Status">
-                                  <Badge
-                                    value={
-                                      c.deletedAt
-                                        ? "In Trash"
-                                        : c.lifecycle === "closed"
-                                          ? "Closed"
-                                          : c.status
-                                    }
-                                  />
-                                </td>
-                                <td data-label="Precheck">
-                                  {!v.analyzed ? (
-                                    <span className="muted">Not checked</span>
-                                  ) : high ? (
-                                    <span className="risk-high">
-                                      {high} high priority
-                                    </span>
-                                  ) : v.findings.length ? (
-                                    <span className="risk-medium">
-                                      {v.findings.length} to verify
-                                    </span>
-                                  ) : (
-                                    <span className="muted">
-                                      <Check size={14} />
-                                      No flags
-                                    </span>
-                                  )}
-                                </td>
-                                <td
-                                  className="owner-cell"
-                                  data-label="People & next action"
-                                >
-                                  <span className="owner">
-                                    <span className="avatar tiny">
-                                      {c.owner
-                                        .split(/[ @.]/)
-                                        .filter(Boolean)
-                                        .slice(0, 2)
-                                        .map((s) => s[0])
-                                        .join("")
-                                        .toUpperCase()}
-                                    </span>
-                                    {c.owner} · Marketing
-                                  </span>
-                                  <small className="reviewer-line">
-                                    Reviewer:{" "}
-                                    {c.reviewer || "Choose on submission"}
-                                  </small>
-                                  <small className="next-action">
-                                    {nextAction(c)}
-                                  </small>
-                                </td>
-                                <td className="muted">
-                                  {c.submittedAt
-                                    ? clock === null
-                                      ? date(c.submittedAt)
-                                      : `${Math.max(0, Math.floor((clock - Date.parse(c.submittedAt)) / 86400000))}d since submission`
-                                    : `Draft · ${date(c.updatedAt)}`}
-                                </td>
-                                <td>
-                                  <ChevronRight size={15} />
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                                    {c.status === "In review" && c.reviewer && (
+                                      <span className="person-role">
+                                        Awaiting decision
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="muted" data-label="Updated">
+                                    {date(c.updatedAt)}
+                                  </td>
+                                  <td>
+                                    <ChevronRight size={15} />
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                     {!queue.length && (
                       <div className="empty">
                         <Search size={28} />
@@ -1253,7 +1227,7 @@ export default function Workspace({
                                 ? "Close a review when it no longer needs active attention. Its history stays available."
                                 : role === "reviewer"
                                   ? "Campaigns will appear here when your marketing team creates them."
-                                  : "Create your first draft. It stays private to your workspace until you submit it for review."}
+                                  : "Create your first draft, then choose a teammate to review it. Everyone in this workspace can see its progress."}
                         </p>
                         {segmentCampaigns.length > 0 && (
                           <Button
@@ -1262,6 +1236,7 @@ export default function Workspace({
                               setSearch("");
                               setFilter("All work");
                               setProductFilter("All products");
+                              setStatusFilter("All statuses");
                             }}
                           >
                             Reset filters
@@ -1273,16 +1248,10 @@ export default function Workspace({
                       {queue.length} campaigns ·{" "}
                       {queueSegment === "trash" ? "in Trash" : queueSegment}
                       <span>
-                        Potential issues are guidance, never automatic
-                        decisions.
+                        Prechecks assist reviewers. Only people approve
+                        campaigns.
                       </span>
                     </div>
-                  </div>
-                  <div className="subtle-footer">
-                    <ShieldCheck size={14} />
-                    {live
-                      ? "Seeded examples and policy requirements are fictional. Your team’s review history is saved."
-                      : "All policies and campaigns in this sample workspace are fictional."}
                   </div>
                 </>
               )}
@@ -1293,11 +1262,10 @@ export default function Workspace({
                     Review queue
                   </button>
                   <div className="page-heading">
-                    <div className="eyebrow">START WITH THE STORY</div>
                     <h1>New submission</h1>
                     <p>
-                      Bring your campaign. We’ll help you prepare it for a
-                      thoughtful human review.
+                      Add your campaign copy, run a precheck, and choose a
+                      reviewer.
                     </p>
                   </div>
                   <div className="new-layout">
@@ -1488,7 +1456,7 @@ export default function Workspace({
                       <span className="guidance-icon">
                         <Sparkles size={22} />
                       </span>
-                      <h2>Good context. Better review.</h2>
+                      <h2>Before you submit</h2>
                       <p>
                         Include the full consumer-facing message so reviewers
                         can see claims in context.
@@ -1528,21 +1496,12 @@ export default function Workspace({
                     <ArrowLeft size={15} />
                     Review queue
                   </button>
-                  {
-                    <p className="workflow-next" role="status">
-                      {latestAnalysisFailed && !historical
-                        ? "Marketing: the external analysis failed. Save a new version to retry; the previous attempt remains in history."
-                        : current.status === "In review"
-                          ? `${current.reviewer || "A compliance reviewer"} is responsible for reviewing v${latest.number}. ${current.owner} owns the marketing copy.`
-                          : current.status === "Changes requested"
-                            ? "Marketing: address the reviewer’s feedback in a new version, then rerun precheck."
-                            : current.status === "Approved"
-                              ? "This exact version is approved. Any further edits create a new draft requiring review."
-                              : current.status === "Rejected"
-                                ? "Marketing: review the decision rationale before creating a new draft."
-                                : "Marketing: prepare the copy, run precheck, and submit this version for review."}
-                    </p>
-                  }
+                  {latestAnalysisFailed && !historical && (
+                    <div className="alert error" role="alert">
+                      Precheck failed. Save a new version to try again; your
+                      copy is safe.
+                    </div>
+                  )}
                   <div className="review-heading">
                     <div>
                       <div className="review-kicker">
@@ -1565,11 +1524,6 @@ export default function Workspace({
                           current.lifecycle === "closed") && (
                           <span>Review status: {current.status}</span>
                         )}
-                        <span>Marketing: {current.owner}</span>
-                        <span>
-                          {historical ? "Current reviewer" : "Reviewer"}:{" "}
-                          {current.reviewer || "Not assigned yet"}
-                        </span>
                         <span>
                           {busy
                             ? "Saving…"
@@ -1683,15 +1637,26 @@ export default function Workspace({
                   </div>
                   <div className="review-context-strip">
                     <div>
-                      <small>AUTHOR</small>
+                      <small>Author</small>
                       <strong>{current.owner}</strong>
                     </div>
                     <div>
-                      <small>REVIEW REQUESTED FROM</small>
+                      <small>Reviewer</small>
                       <strong>{current.reviewer || "Not assigned"}</strong>
+                      {canAssignReviewer && current.reviewerId && (
+                        <button
+                          className="reviewer-change"
+                          aria-expanded={reviewerPickerOpen}
+                          onClick={() => setReviewerPickerOpen((open) => !open)}
+                        >
+                          {reviewerPickerOpen
+                            ? "Cancel reassignment"
+                            : "Change reviewer"}
+                        </button>
+                      )}
                     </div>
                     <div>
-                      <small>VERSION</small>
+                      <small>Version</small>
                       <strong>
                         v{version.number}{" "}
                         {historical ? "· historical" : "· current"}
@@ -1720,13 +1685,8 @@ export default function Workspace({
                       </span>
                     </button>
                   </div>
-                  {reviewActive &&
-                    !historical &&
-                    ((editable && current.status === "Draft") ||
-                      (current.status === "In review" &&
-                        (current.ownerId === activeUserId ||
-                          workspaces.find((w) => w.id === workspaceId)
-                            ?.owner_id === activeUserId))) && (
+                  {canAssignReviewer &&
+                    (!current.reviewerId || reviewerPickerOpen) && (
                       <div className="reviewer-picker">
                         <label>
                           Compliance reviewer
@@ -1868,23 +1828,6 @@ export default function Workspace({
                       </div>
                     </div>
                   )}
-                  {reviewActive &&
-                    current.status === "In review" &&
-                    role === "marketer" &&
-                    !live && (
-                      <div className="demo-next-step">
-                        <ShieldCheck size={16} />
-                        <span>
-                          Ready for a human decision. Switch{" "}
-                          <strong>
-                            Explore as →{" "}
-                            {current.reviewer || "your assigned reviewer"} ·
-                            Reviewer
-                          </strong>{" "}
-                          above to continue the review.
-                        </span>
-                      </div>
-                    )}
                   {version.assessmentWarning && (
                     <div className="alert error" role="alert">
                       {version.assessmentWarning}
@@ -1949,45 +1892,6 @@ export default function Workspace({
                           ? "Unsaved edits · save a new version to run precheck"
                           : "Original wording preserved in version history"}
                       </div>
-                      {current.versions.length > 1 && (
-                        <div className="diff">
-                          <h3>
-                            What changed since v
-                            {version.number > 1 ? version.number - 1 : 1}
-                          </h3>
-                          {version.number > 1 ? (
-                            <>
-                              <del>
-                                {current.versions[viewVersion - 1].content}
-                              </del>
-                              <ins>{version.content}</ins>
-                              {version.analyzed ? (
-                                <p>
-                                  {
-                                    current.versions[
-                                      viewVersion - 1
-                                    ].findings.filter(
-                                      (f) =>
-                                        !version.findings.some(
-                                          (n) => n.policyId === f.policyId,
-                                        ),
-                                    ).length
-                                  }{" "}
-                                  prior policy flags no longer matched in this
-                                  precheck. This is not proof of compliance.
-                                </p>
-                              ) : (
-                                <p>
-                                  Run precheck to compare findings on this
-                                  revision.
-                                </p>
-                              )}
-                            </>
-                          ) : (
-                            <p>This is the original version.</p>
-                          )}
-                        </div>
-                      )}
                     </section>
                     <section
                       className="panel findings-panel"
@@ -1998,6 +1902,7 @@ export default function Workspace({
                           (t) => (
                             <button
                               className={detailTab === t ? "selected" : ""}
+                              aria-pressed={detailTab === t}
                               key={t}
                               onClick={() => setDetailTab(t)}
                             >
@@ -2278,7 +2183,6 @@ export default function Workspace({
               {tab === "analytics" && (
                 <>
                   <div className="page-heading">
-                    <div className="eyebrow">THE BIGGER PICTURE</div>
                     <h1>Review insights</h1>
                     <p>
                       Understand what’s moving, what’s waiting, and where to
@@ -2377,9 +2281,9 @@ export default function Workspace({
                     </section>
                   </div>
                   <p className="subtle-footer">
-                    {live ? "Workspace records" : "Preview records"} ·
-                    Metrics update as you work. Turnaround excludes drafts and
-                    undecided submissions.
+                    {live ? "Workspace records" : "Preview records"} · Metrics
+                    update as you work. Turnaround excludes drafts and undecided
+                    submissions.
                   </p>
                 </>
               )}

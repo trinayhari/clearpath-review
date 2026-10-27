@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { Button } from "./ui/button";
+import { Modal } from "./ui/modal";
+import { Plus, X } from "lucide-react";
 import type { Membership, Role } from "@/lib/domain";
 
 type Team = { id: string; name: string; owner_id?: string };
@@ -24,6 +26,7 @@ export function TeamPanel({
   onDemoRename: (name: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [teamAction, setTeamAction] = useState<"create" | "join" | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [invite, setInvite] = useState("");
@@ -56,6 +59,7 @@ export function TeamPanel({
           setInviteId("");
         }
         await onChange(result.workspaceId);
+        setTeamAction(null);
         setNotice(
           data.action === "join"
             ? "You joined the team."
@@ -72,13 +76,33 @@ export function TeamPanel({
   }
   return (
     <>
-      <div className="page-heading">
-        <div className="eyebrow">THE PEOPLE BEHIND EVERY DECISION</div>
-        <h1>Team &amp; people</h1>
-        <p>
-          Create a team, bring in marketing and compliance colleagues, and give
-          every review a clear owner.
-        </p>
+      <div className="page-heading heading-row">
+        <div>
+          <h1>Team &amp; people</h1>
+          <p>Manage the people who write and review your campaigns.</p>
+        </div>
+        <div className="team-header-actions">
+          {live && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setError("");
+                setTeamAction("join");
+              }}
+            >
+              Join a team
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            onClick={() => {
+              setError("");
+              setTeamAction("create");
+            }}
+          >
+            <Plus size={16} /> New team
+          </Button>
+        </div>
       </div>
       {!live && (
         <p className="workflow-next">
@@ -86,7 +110,7 @@ export function TeamPanel({
           invite real colleagues.
         </p>
       )}
-      {error && (
+      {error && !teamAction && (
         <p className="alert error" role="alert">
           {error}
         </p>
@@ -107,36 +131,6 @@ export function TeamPanel({
               </p>
             </div>
           </div>
-          {admin && (
-            <form
-              className="team-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const name = String(new FormData(e.currentTarget).get("name"));
-                if (live)
-                  void command({
-                    action: "rename",
-                    workspaceId: team?.id,
-                    name,
-                  });
-                else onDemoRename(name);
-              }}
-            >
-              <label>
-                Team display name
-                <input
-                  name="name"
-                  defaultValue={team?.name}
-                  required
-                  minLength={2}
-                  maxLength={80}
-                />
-              </label>
-              <Button variant="outline" disabled={busy}>
-                Save team name
-              </Button>
-            </form>
-          )}
           <ul className="people-list">
             {members.map((m) => (
               <li key={m.user_id}>
@@ -149,14 +143,14 @@ export function TeamPanel({
                     {m.user_id === userId ? " (you)" : ""}
                   </strong>
                   <p>
-                    {m.role === "reviewer"
-                      ? "Compliance reviewer · makes assigned review decisions"
-                      : "Marketing · writes and submits campaigns"}
+                    {m.user_id === team?.owner_id
+                      ? "Team owner"
+                      : "Team member"}
                   </p>
-                  {m.user_id === team?.owner_id && (
-                    <small>Team owner · manages people and invitations</small>
-                  )}
                 </div>
+                <span className="member-role">
+                  {m.role === "reviewer" ? "Reviewer" : "Marketing"}
+                </span>
               </li>
             ))}
           </ul>
@@ -167,177 +161,137 @@ export function TeamPanel({
             </p>
           )}
           {admin && (
-            <form
-              className="team-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const f = new FormData(e.currentTarget);
-                if (live)
-                  void command({
-                    action: "invite",
-                    workspaceId: team?.id,
-                    role: f.get("role"),
-                  });
-                else {
-                  onDemoMember(String(f.get("name")), f.get("role") as Role);
-                  e.currentTarget.reset();
-                }
-              }}
-            >
-              <h3>{live ? "Invite a colleague" : "Add a sample colleague"}</h3>
-              {!live && (
+            <details className="team-settings">
+              <summary>Team settings</summary>
+              <form
+                className="team-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const name = String(
+                    new FormData(e.currentTarget).get("name"),
+                  );
+                  if (live)
+                    void command({
+                      action: "rename",
+                      workspaceId: team?.id,
+                      name,
+                    });
+                  else onDemoRename(name);
+                }}
+              >
                 <label>
-                  Sample colleague name
+                  Team display name
                   <input
                     name="name"
+                    defaultValue={team?.name}
                     required
                     minLength={2}
                     maxLength={80}
-                    placeholder="e.g. Jordan Lee"
                   />
                 </label>
-              )}
-              <label>
-                Team role
-                <select name="role">
-                  <option value="reviewer">Compliance reviewer</option>
-                  <option value="marketer">Marketing</option>
-                </select>
-              </label>
-              <p>
-                Reviewers can decide only the campaigns assigned to them. Team
-                ownership does not grant approval permission.
-              </p>
-              <Button disabled={busy}>
-                {live ? "Create invitation code" : "Add sample colleague"}
-              </Button>
-            </form>
-          )}
-          {invite && (
-            <div className="invite-result">
-              <label>
-                One-use invitation code
-                <textarea readOnly value={invite} rows={3} />
-              </label>
-              <p>
-                Ask your colleague to sign in, open Team &amp; people, and paste
-                this code under Join a team. Anyone holding it can join with the
-                selected role.
-              </p>
-              <Button
-                variant="outline"
-                onClick={() =>
-                  navigator.clipboard
-                    .writeText(invite)
-                    .then(() => setNotice("Invitation code copied."))
-                    .catch(() => setError("Copy the invitation code manually."))
-                }
-              >
-                Copy invitation code
-              </Button>
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() =>
-                  command({ action: "revoke", workspaceId: team?.id, inviteId })
-                }
-              >
-                Revoke this invitation
-              </Button>
-            </div>
+                <Button variant="outline" disabled={busy}>
+                  Save team name
+                </Button>
+              </form>
+            </details>
           )}
         </section>
         <div className="team-side">
-          <form
-            className="panel team-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const f = new FormData(e.currentTarget);
-              if (live)
-                void command({
-                  action: "create",
-                  name: f.get("name"),
-                  displayName: f.get("displayName"),
-                  role: "marketer",
-                });
-              else onDemoCreate(String(f.get("name")));
-            }}
-          >
-            <h2>Create a team</h2>
-            <p>
-              A separate space for your campaigns, people and review history.
-              You’ll be the team owner and a marketer.
-            </p>
-            <label>
-              Team name
-              <input
-                name="name"
-                required
-                minLength={2}
-                maxLength={80}
-                placeholder="e.g. Consumer lending"
-              />
-            </label>
-            {live && (
-              <label>
-                Your display name
-                <input
-                  name="displayName"
-                  required
-                  minLength={2}
-                  maxLength={80}
-                  defaultValue={
-                    members.find((m) => m.user_id === userId)?.display_name ||
-                    ""
-                  }
-                />
-              </label>
-            )}
-            <Button disabled={busy}>Create team</Button>
-          </form>
-          {live && (
-            <form
-              className="panel team-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const f = new FormData(e.currentTarget);
-                void command({
-                  action: "join",
-                  token: String(f.get("token")).trim(),
-                  displayName: f.get("displayName"),
-                });
-              }}
-            >
-              <h2>Join a team</h2>
-              <p>
-                Get an invitation code from the team owner. Your role is set by
-                their invitation.
-              </p>
-              <label>
-                Invitation code
-                <textarea
-                  name="token"
-                  required
-                  minLength={64}
-                  maxLength={64}
-                  rows={3}
-                  autoComplete="off"
-                />
-              </label>
-              <label>
-                Your display name
-                <input
-                  name="displayName"
-                  required
-                  minLength={2}
-                  maxLength={80}
-                />
-              </label>
-              <Button disabled={busy} variant="outline">
-                Join team
-              </Button>
-            </form>
+          {admin && (
+            <section className="panel team-invite">
+              {admin && (
+                <form
+                  className="team-form"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const f = new FormData(e.currentTarget);
+                    if (live)
+                      void command({
+                        action: "invite",
+                        workspaceId: team?.id,
+                        role: f.get("role"),
+                      });
+                    else {
+                      onDemoMember(
+                        String(f.get("name")),
+                        f.get("role") as Role,
+                      );
+                      e.currentTarget.reset();
+                    }
+                  }}
+                >
+                  <h3>
+                    {live ? "Invite a colleague" : "Add a sample colleague"}
+                  </h3>
+                  {!live && (
+                    <label>
+                      Sample colleague name
+                      <input
+                        name="name"
+                        required
+                        minLength={2}
+                        maxLength={80}
+                        placeholder="e.g. Jordan Lee"
+                      />
+                    </label>
+                  )}
+                  <label>
+                    Team role
+                    <select name="role">
+                      <option value="reviewer">Compliance reviewer</option>
+                      <option value="marketer">Marketing</option>
+                    </select>
+                  </label>
+                  <p>
+                    Reviewers can make decisions on campaigns assigned to them.
+                  </p>
+                  <Button disabled={busy}>
+                    {live ? "Create invitation code" : "Add sample colleague"}
+                  </Button>
+                </form>
+              )}
+              {invite && (
+                <div className="invite-result">
+                  <label>
+                    One-use invitation code
+                    <textarea readOnly value={invite} rows={3} />
+                  </label>
+                  <p>
+                    Ask your colleague to sign in, open Team &amp; people, and
+                    paste this code under Join a team. Anyone holding it can
+                    join with the selected role.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      navigator.clipboard
+                        .writeText(invite)
+                        .then(() => setNotice("Invitation code copied."))
+                        .catch(() =>
+                          setError("Copy the invitation code manually."),
+                        )
+                    }
+                  >
+                    Copy invitation code
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() =>
+                      command({
+                        action: "revoke",
+                        workspaceId: team?.id,
+                        inviteId,
+                      })
+                    }
+                  >
+                    Revoke this invitation
+                  </Button>
+                </div>
+              )}
+            </section>
           )}
+
           <div className="team-explainer">
             <h3>Who does what?</h3>
             <p>
@@ -355,6 +309,121 @@ export function TeamPanel({
           </div>
         </div>
       </div>
+      {teamAction && (
+        <Modal
+          labelledBy="team-action-title"
+          onClose={() => {
+            if (!busy) setTeamAction(null);
+          }}
+        >
+          <div className="panel modal team-dialog">
+            <button
+              className="modal-close"
+              aria-label="Close team dialog"
+              disabled={busy}
+              onClick={() => setTeamAction(null)}
+            >
+              <X size={18} />
+            </button>
+            {error && (
+              <p className="alert error" role="alert">
+                {error}
+              </p>
+            )}
+            {teamAction === "create" ? (
+              <form
+                className="team-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  if (live)
+                    void command({
+                      action: "create",
+                      name: f.get("name"),
+                      displayName: f.get("displayName"),
+                      role: "marketer",
+                    });
+                  else onDemoCreate(String(f.get("name")));
+                }}
+              >
+                <h2 id="team-action-title">Create a team</h2>
+                <p>
+                  A separate space for your campaigns, people and review
+                  history. You’ll be the team owner and a marketer.
+                </p>
+                <label>
+                  Team name
+                  <input
+                    name="name"
+                    required
+                    minLength={2}
+                    maxLength={80}
+                    placeholder="e.g. Consumer lending"
+                  />
+                </label>
+                {live && (
+                  <label>
+                    Your display name
+                    <input
+                      name="displayName"
+                      required
+                      minLength={2}
+                      maxLength={80}
+                      defaultValue={
+                        members.find((m) => m.user_id === userId)
+                          ?.display_name || ""
+                      }
+                    />
+                  </label>
+                )}
+                <Button disabled={busy}>Create team</Button>
+              </form>
+            ) : (
+              <form
+                className="team-form"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const f = new FormData(e.currentTarget);
+                  void command({
+                    action: "join",
+                    token: String(f.get("token")).trim(),
+                    displayName: f.get("displayName"),
+                  });
+                }}
+              >
+                <h2 id="team-action-title">Join a team</h2>
+                <p>
+                  Get an invitation code from the team owner. Your role is set
+                  by their invitation.
+                </p>
+                <label>
+                  Invitation code
+                  <textarea
+                    name="token"
+                    required
+                    minLength={64}
+                    maxLength={64}
+                    rows={3}
+                    autoComplete="off"
+                  />
+                </label>
+                <label>
+                  Your display name
+                  <input
+                    name="displayName"
+                    required
+                    minLength={2}
+                    maxLength={80}
+                  />
+                </label>
+                <Button disabled={busy} variant="outline">
+                  Join team
+                </Button>
+              </form>
+            )}
+          </div>
+        </Modal>
+      )}
     </>
   );
 }

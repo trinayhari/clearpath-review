@@ -11,6 +11,16 @@ test("sample team creation, colleague setup and switching keep campaigns scoped"
     page.getByRole("heading", { name: "ClearPath Financial", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("Alex Morgan", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "New team", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Create a team" }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "New team", exact: true }),
+  ).toBeFocused();
+  await page.getByRole("button", { name: "New team", exact: true }).click();
   await page.getByLabel("Team name", { exact: true }).fill("Consumer lending");
   await page.getByRole("button", { name: "Create team", exact: true }).click();
   await expect(
@@ -20,7 +30,9 @@ test("sample team creation, colleague setup and switching keep campaigns scoped"
     page.getByText(/Your team needs a compliance reviewer/),
   ).toBeVisible();
   await page.getByLabel("Sample colleague name").fill("Jordan Lee");
-  await page.getByRole("combobox", { name: "Team role", exact: true }).selectOption("reviewer");
+  await page
+    .getByRole("combobox", { name: "Team role", exact: true })
+    .selectOption("reviewer");
   await page
     .getByRole("button", { name: "Add sample colleague", exact: true })
     .click();
@@ -78,8 +90,25 @@ test("named reviewer receives the submission and only their sample persona sees 
     .selectOption({ label: "Jordan Lee" });
   await page.getByRole("button", { name: "Submit v1 for review" }).click();
   await expect(
-    page.getByText("Reviewer: Jordan Lee", { exact: true }),
+    page
+      .locator(".review-context-strip")
+      .getByText("Jordan Lee", { exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByLabel("Compliance reviewer", { exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Change reviewer", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Compliance reviewer", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Cancel reassignment", exact: true })
+    .click();
+  await expect(
+    page.getByLabel("Compliance reviewer", { exact: true }),
+  ).toHaveCount(0);
   await page.getByLabel("Preview role").selectOption("reviewer");
   await expect(
     page.getByRole("button", { name: "Record decision", exact: true }),
@@ -174,11 +203,10 @@ test("team create, invitation and join controls send scoped authenticated API re
   await page
     .getByRole("button", { name: "Team & people", exact: true })
     .click();
-  const create = page
-    .locator("form")
-    .filter({
-      has: page.getByRole("heading", { name: "Create a team", exact: true }),
-    });
+  await page.getByRole("button", { name: "New team", exact: true }).click();
+  const create = page.locator("form").filter({
+    has: page.getByRole("heading", { name: "Create a team", exact: true }),
+  });
   await create
     .getByLabel("Team name", { exact: true })
     .fill("Growth marketing");
@@ -204,11 +232,10 @@ test("team create, invitation and join controls send scoped authenticated API re
     workspaceId: created,
     role: "reviewer",
   });
-  const join = page
-    .locator("form")
-    .filter({
-      has: page.getByRole("heading", { name: "Join a team", exact: true }),
-    });
+  await page.getByRole("button", { name: "Join a team", exact: true }).click();
+  const join = page.locator("form").filter({
+    has: page.getByRole("heading", { name: "Join a team", exact: true }),
+  });
   await join.getByLabel("Invitation code", { exact: true }).fill(token);
   await join.getByLabel("Your display name").fill("Morgan");
   await join.getByRole("button", { name: "Join team", exact: true }).click();

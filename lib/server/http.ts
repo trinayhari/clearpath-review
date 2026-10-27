@@ -47,6 +47,38 @@ export async function readJsonBody(
   }
 }
 const workflowMessages: Record<string, { status: number; message: string }> = {
+  "Live analysis is not enabled": {
+    status: 503,
+    message: "Live analysis is not enabled for this workspace.",
+  },
+  "Analysis user quota reached": {
+    status: 429,
+    message: "Your analysis request limit has been reached. Try again later.",
+  },
+  "Analysis workspace quota reached": {
+    status: 429,
+    message: "This workspace’s analysis request limit has been reached.",
+  },
+  "Analysis global budget exhausted": {
+    status: 429,
+    message:
+      "The approved analysis budget has been reserved. No further calls will run.",
+  },
+  "Analysis reservation expired": {
+    status: 409,
+    message:
+      "This analysis reservation expired. Create a revised version before retrying.",
+  },
+  "Stale or locked analysis version": {
+    status: 409,
+    message:
+      "The campaign changed during analysis. Refresh to review the current version.",
+  },
+  "This analysis was already attempted. Refresh or create a new version.": {
+    status: 409,
+    message:
+      "This analysis was already attempted. Refresh or create a new version.",
+  },
   "Authentication required": {
     status: 401,
     message: "Your session expired. Sign in again to continue.",

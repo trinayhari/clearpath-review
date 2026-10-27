@@ -20,7 +20,7 @@ A production-minded marketing compliance review vertical slice for **fictional C
 
 ## Stack and commands
 
-Node 24, Next.js App Router, React, TypeScript, Tailwind v4, shadcn-style Button (Radix Slot/CVA; `components.json`), Lucide, Supabase PostgreSQL/Auth. Exact versions and `package-lock.json` are committed. No live AI SDK, external model call, or paid model usage.
+Node 24, Next.js App Router, React, TypeScript, Tailwind v4, shadcn-style Button (Radix Slot/CVA; `components.json`), Lucide, Supabase PostgreSQL/Auth. Exact versions and `package-lock.json` are committed. No paid model usage has occurred. A disabled server-only OpenAI runtime candidate is implemented and locally tested; production still uses mock analysis pending explicit activation. See [trusted runtime design](docs/LIVE-ANALYSIS-DESIGN.md).
 
 ```sh
 npm ci
@@ -35,7 +35,7 @@ The public demo works without environment variables. Authenticated endpoints fai
 
 ## Database setup and evaluator roles
 
-Migrations: `supabase/migrations/20261026170000_review_workflow.sql` and `supabase/migrations/20261026172000_database_owned_assessments.sql` (apply both in order). Seed: `supabase/seed.sql` creates only a fictional workspace, never accounts or credentials.
+Hosted migrations: `supabase/migrations/20261026170000_review_workflow.sql` and `supabase/migrations/20261026172000_database_owned_assessments.sql`. The third migration, `20261027012748_reserved_trusted_external_analysis.sql`, is a locally verified, inactive runtime candidate awaiting hosted approval; do not imply it is already applied. Seed: `supabase/seed.sql` creates only a fictional workspace, never accounts or credentials.
 
 Apply the migration to a dedicated Supabase project with the CLI or an authorized management connection. Never run test bootstrap SQL on a deployed database. The migration was verified against isolated PostgreSQL 17 and applied to project `tztlatsflqjlfadipguu`. All six public tables have RLS enabled. Supabase security advisors returned no findings after application.
 

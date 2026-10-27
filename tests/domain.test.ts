@@ -169,3 +169,44 @@ test("Unicode evidence offsets are verified as code points", async () => {
   const findings = await mockProvider.analyze(copy, "Personal loans");
   assert.equal(validateFindings(findings, copy, "Personal loans").length, 1);
 });
+
+test("read boundary requires complete live provenance and preserves honest provider label", async () => {
+  const { safeAssessment } = await import("../lib/domain");
+  const record = {
+    trusted: true,
+    provider: "openai-responses-v1",
+    execution_id: "00000000-0000-4000-8000-000000000001",
+    findings: [],
+    provenance: {
+      model: "gpt-5.4-mini-2026-03-17",
+      policyBundle: "clearpath-review-2026-10-27-v1",
+      contentHash: "a".repeat(64),
+      responseId: "resp_synthetic",
+      inputTokens: 100,
+      outputTokens: 20,
+    },
+  };
+  const result = safeAssessment(
+    record,
+    "A complete fictional marketing sentence.",
+    "Personal loans",
+  );
+  assert.equal(result.analyzed, true);
+  assert.equal(result.assessmentProvider, "openai");
+  assert.equal(
+    safeAssessment(
+      { ...record, provenance: null },
+      "A complete fictional marketing sentence.",
+      "Personal loans",
+    ).analyzed,
+    false,
+  );
+  assert.equal(
+    safeAssessment(
+      { ...record, execution_id: null },
+      "A complete fictional marketing sentence.",
+      "Personal loans",
+    ).analyzed,
+    false,
+  );
+});

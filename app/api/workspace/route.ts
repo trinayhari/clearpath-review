@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { serverClient, configured } from "@/lib/supabase";
 import { contentSchema, safeAssessment } from "@/lib/domain";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
+import { runTrustedAnalysis } from "@/lib/server/trusted-analysis";
 import {
   verifiedRequestOrigin,
   readJsonBody,
   RequestInputError,
   workflowFailure,
 } from "@/lib/server/http";
+export const maxDuration = 45;
 const command = z.object({
   action: z.enum([
     "create",
@@ -19,6 +22,7 @@ const command = z.object({
     "reject",
     "request_changes",
   ]),
+  requestId: z.string().uuid().optional(),
   campaignId: z.string().uuid().optional(),
   versionId: z.string().uuid().optional(),
   data: z.record(z.string(), z.unknown()).default({}),
@@ -49,6 +53,10 @@ export async function GET() {
       results.map((r) => r.data!);
     return NextResponse.json(
       {
+        analysisMode:
+          process.env.CLEARPATH_LIVE_ANALYSIS_ENABLED === "true"
+            ? "openai"
+            : "mock",
         userId: user.id,
         email: user.email,
         members,
@@ -150,6 +158,27 @@ export async function POST(req: NextRequest) {
       input.data = {
         note: z.string().trim().min(3).max(4000).parse(input.data.note),
       };
+    if (
+      input.action === "analyze" &&
+      process.env.CLEARPATH_LIVE_ANALYSIS_ENABLED === "true"
+    ) {
+      const result = await runTrustedAnalysis(
+        db,
+        {
+          actorId: user.id,
+          campaignId: z.uuid().parse(input.campaignId),
+          versionId: z.uuid().parse(input.versionId),
+          requestId: input.requestId ?? randomUUID(),
+        },
+        {
+          enabled: true,
+          apiKey: process.env.OPENAI_API_KEY ?? "",
+          keyId: process.env.CLEARPATH_ANALYSIS_KEY_ID ?? "",
+          signingSecretHex: process.env.CLEARPATH_ANALYSIS_SIGNING_KEY ?? "",
+        },
+      );
+      return NextResponse.json(result);
+    }
     if (input.action === "analyze") input.data = {}; // Database computes trusted mock findings from stored copy.
     const { data, error } = await db.rpc("cp_command", {
       p_action: input.action,

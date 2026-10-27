@@ -42,7 +42,7 @@ type Tab = "queue" | "policies" | "analytics" | "new" | "review";
 const actionLabels: Record<string, string> = {
   create: "created the campaign",
   revise: "saved a new version",
-  analyze: "ran mock precheck",
+  analyze: "ran precheck",
   submit: "submitted for review",
   approve: "approved this version",
   reject: "rejected this version",
@@ -73,6 +73,7 @@ export default function Workspace({
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">(
     mode === "live" ? "loading" : "ready",
   );
+  const [analysisMode, setAnalysisMode] = useState<"mock" | "openai">("mock");
   const [identity, setIdentity] = useState({ name: "", email: "" });
   const [draftEdits, setDraftEdits] = useState<
     Record<string, { versionId: string; content: string }>
@@ -138,6 +139,7 @@ export default function Workspace({
       throw new Error("Your session expired. Sign in again to continue.");
     }
     if (!r.ok) throw new Error(data.error);
+    setAnalysisMode(data.analysisMode === "openai" ? "openai" : "mock");
     setCampaigns(data.campaigns);
     setUserId(data.userId);
     setMemberships(data.members);
@@ -246,6 +248,7 @@ export default function Workspace({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             action,
+            requestId: crypto.randomUUID(),
             campaignId: current.id,
             versionId: latest.id,
             data,
@@ -284,7 +287,9 @@ export default function Workspace({
         action === "revise"
           ? "New immutable version saved. Run precheck again before submitting."
           : action === "analyze"
-            ? "Mock precheck complete. Human review is still required."
+            ? live && analysisMode === "openai"
+              ? "OpenAI precheck complete. Human review is still required."
+              : "Mock precheck complete. Human review is still required."
             : action === "submit"
               ? "Version submitted. Content is now locked for human review."
               : action === "comment"
@@ -1091,7 +1096,11 @@ export default function Workspace({
                           <span>Keep the original version on record.</span>
                         </li>
                         <li>
-                          <strong>Run a mock precheck</strong>
+                          <strong>
+                            {live && analysisMode === "openai"
+                              ? "Run an AI precheck"
+                              : "Run a mock precheck"}
+                          </strong>
                           <span>
                             Review policy matches and uncertain claims.
                           </span>
@@ -1102,8 +1111,9 @@ export default function Workspace({
                         </li>
                       </ol>
                       <small>
-                        Mock analysis is deterministic. No content is sent to an
-                        external AI provider.
+                        {live && analysisMode === "openai"
+                          ? "Running precheck sends this campaign copy to OpenAI for analysis. Only submit authorized fictional test content during validation."
+                          : "Mock analysis is deterministic. No content is sent to an external AI provider."}
                       </small>
                     </aside>
                   </div>
@@ -1416,9 +1426,11 @@ export default function Workspace({
                           <div className="analysis-summary">
                             <span className="mock-label">
                               <Sparkles size={13} />
-                              {live
-                                ? "Mock precheck · deterministic rules"
-                                : "Mock analysis · demonstration only"}
+                              {version.assessmentProvider === "openai"
+                                ? `OpenAI analysis · ${version.analysisModel}`
+                                : live
+                                  ? "Mock precheck · deterministic rules"
+                                  : "Mock analysis · demonstration only"}
                             </span>
                             <p>
                               {version.analyzed
@@ -1746,7 +1758,7 @@ export default function Workspace({
                     </section>
                     <section className="panel chart">
                       <h2>Most frequent findings</h2>
-                      <p>Latest version only · mock rule matches</p>
+                      <p>Latest version only · analysis findings</p>
                       {policies
                         .map((p) => ({
                           p,
@@ -1844,7 +1856,7 @@ export default function Workspace({
             <h2 id="decision-title">Record a decision on v{latest.number}</h2>
             <p>{current.title}</p>
             <div className="decision-context">
-              {latest.findings.length} mock findings to consider. You are
+              {latest.findings.length} analysis findings to consider. You are
               responsible for verifying product terms and disclosures.
             </div>
             <label htmlFor="review-decision">

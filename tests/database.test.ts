@@ -437,6 +437,9 @@ test("PostgreSQL RLS and transactional workflow security", async (t) => {
         /permission denied/,
       );
     });
+    const { testTrustedRuntime } = await import("./helpers/trusted-runtime");
+    await db.query("reset role");
+    await testTrustedRuntime(t, db, connectionString);
   } finally {
     await db.end();
   }

@@ -1,3 +1,4 @@
+import "server-only";
 // Server-only adapter. Deliberately not wired to an HTTP route or the public preview.
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -28,6 +29,11 @@ export function createOpenAIProvider(config: {
   enabled: boolean;
   transport?: typeof fetch;
   timeoutMs?: number;
+  onResponse?: (metadata: {
+    responseId: string;
+    inputTokens: number;
+    outputTokens: number;
+  }) => void;
 }): AnalysisProvider {
   return {
     async analyze(content, product) {
@@ -37,8 +43,13 @@ export function createOpenAIProvider(config: {
       z.enum(products).parse(product);
       const rules = applicablePolicies(product);
       let response: Response;
+      const boundedTransport: typeof fetch = async (url, init) => {
+        if (Buffer.byteLength(String(init?.body), "utf8") > 100000)
+          throw new Error("Analysis request exceeds its input budget.");
+        return (config.transport ?? fetch)(url, init);
+      };
       try {
-        response = await (config.transport ?? fetch)(
+        response = await boundedTransport(
           "https://api.openai.com/v1/responses",
           {
             method: "POST",
@@ -103,6 +114,8 @@ export function createOpenAIProvider(config: {
         offset += chunk.length;
       }
       let envelope: {
+        id?: string;
+        usage?: { input_tokens?: number; output_tokens?: number };
         status?: string;
         output?: {
           type?: string;
@@ -134,7 +147,7 @@ export function createOpenAIProvider(config: {
       } catch {
         throw new Error("Analysis returned invalid structured output.");
       }
-      return validateFindings(
+      const findings = validateFindings(
         parsed.findings.map((f) => {
           const policy = rules.find((p) => p.id === f.policyId),
             index = content.indexOf(f.evidence);
@@ -155,6 +168,23 @@ export function createOpenAIProvider(config: {
         content,
         product,
       );
+      if (config.onResponse) {
+        const metadata = z
+          .object({
+            responseId: z.string().min(1).max(200),
+            inputTokens: z.number().int().min(0).max(102048),
+            outputTokens: z.number().int().min(0).max(4500),
+          })
+          .safeParse({
+            responseId: envelope.id,
+            inputTokens: envelope.usage?.input_tokens,
+            outputTokens: envelope.usage?.output_tokens,
+          });
+        if (!metadata.success)
+          throw new Error("Analysis returned invalid usage metadata.");
+        config.onResponse(metadata.data);
+      }
+      return findings;
     },
   };
 }

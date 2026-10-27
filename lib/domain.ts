@@ -37,6 +37,8 @@ export const findingSchema = z.object({
 export type Finding = z.infer<typeof findingSchema>;
 export type Version = {
   assessmentWarning?: string;
+  assessmentProvider?: "mock" | "openai";
+  analysisModel?: string;
   id: string;
   number: number;
   content: string;
@@ -298,19 +300,46 @@ export function safeAssessment(
   record: unknown,
   content: string,
   product: string,
-): Pick<Version, "findings" | "analyzed" | "assessmentWarning"> {
+): Pick<
+  Version,
+  | "findings"
+  | "analyzed"
+  | "assessmentWarning"
+  | "assessmentProvider"
+  | "analysisModel"
+> {
   if (!record) return { findings: [], analyzed: false };
   try {
     const a = z
-      .object({
-        trusted: z.literal(true),
-        provider: z.literal("deterministic-mock-v2-db"),
-        findings: z.unknown(),
-      })
+      .discriminatedUnion("provider", [
+        z.object({
+          trusted: z.literal(true),
+          provider: z.literal("deterministic-mock-v2-db"),
+          findings: z.unknown(),
+        }),
+        z.object({
+          trusted: z.literal(true),
+          provider: z.literal("openai-responses-v1"),
+          findings: z.unknown(),
+          execution_id: z.uuid(),
+          provenance: z.object({
+            model: z.literal("gpt-5.4-mini-2026-03-17"),
+            policyBundle: z.literal("clearpath-review-2026-10-27-v1"),
+            contentHash: z.string().regex(/^[a-f0-9]{64}$/),
+            responseId: z.string().min(1).max(200),
+            inputTokens: z.number().int().min(0).max(102048),
+            outputTokens: z.number().int().min(0).max(4500),
+          }),
+        }),
+      ])
       .parse(record);
     return {
       findings: validateFindings(a.findings, content, product),
       analyzed: true,
+      assessmentProvider:
+        a.provider === "openai-responses-v1" ? "openai" : "mock",
+      analysisModel:
+        a.provider === "openai-responses-v1" ? a.provenance.model : undefined,
     };
   } catch {
     return {

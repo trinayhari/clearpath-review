@@ -20,7 +20,7 @@ A production-minded marketing compliance review vertical slice for **fictional C
 
 ## Stack and commands
 
-Node 24, Next.js App Router, React, TypeScript, Tailwind v4, shadcn-style Button (Radix Slot/CVA; `components.json`), Lucide, Supabase PostgreSQL/Auth. Exact versions and `package-lock.json` are committed. A server-only OpenAI runtime is verified through one successful authenticated fictional analysis after two safely rejected attempts. The successful anchored-contract request persisted three findings and exact evidence, then proceeded to a separate assigned-reviewer decision. Total permanent reservations are $0.60; failed-request charges remain unknown. Live access is restricted to the approved QA workspace during bounded validation, with parent-managed shutdown after testing. Other workspaces remain mock-only. See [trusted runtime design](docs/LIVE-ANALYSIS-DESIGN.md).
+Node 24, Next.js App Router, React, TypeScript, Tailwind v4, shadcn-style Button (Radix Slot/CVA; `components.json`), Lucide, Supabase PostgreSQL/Auth. Exact versions and `package-lock.json` are committed. A server-only OpenAI runtime is verified through one successful authenticated fictional analysis after two safely rejected attempts. The successful anchored-contract request persisted three findings and exact evidence, then proceeded to a separate assigned-reviewer decision. Total permanent reservations are $0.60; failed-request charges remain unknown. Live execution is disabled after bounded validation; stored OpenAI results retain their provenance. Activation remains restricted to separately approved workspaces. Other workspaces remain mock-only. See [trusted runtime design](docs/LIVE-ANALYSIS-DESIGN.md).
 
 ```sh
 npm ci
